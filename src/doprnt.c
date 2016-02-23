@@ -50,7 +50,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
    Lisp level.  */
 
 /* In the FORMAT argument this function supports ` and ' as directives
-   that output left and right quotes as per ‘text-quoting style’.  It
+   that output left and right quotes as per &lsquo;text-quoting style&rsquo;.  It
    also supports the following %-sequences:
 
    %s means print a string argument.
@@ -485,7 +485,7 @@ doprnt (char *buffer, ptrdiff_t bufsize, const char *format,
    is not limited to returning an 'int' so it doesn't have a silly 2
    GiB limit on typical 64-bit hosts.  However, it is limited to the
    Emacs-style formats that doprnt supports, and it requotes ` and '
-   as per ‘text-quoting-style’.
+   as per &lsquo;text-quoting-style&rsquo;.
 
    Return the number of bytes put into BUF, excluding the terminating
    '\0'.  */

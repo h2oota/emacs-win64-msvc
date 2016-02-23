@@ -3838,8 +3838,8 @@ The first argument is a format control string.
 The other arguments are substituted into it to make the result, a string.
 
 This acts like `format', except it also replaces each left single
-quotation mark (\\=‘) and grave accent (\\=`) by a left quote, and each
-right single quotation mark (\\=’) and apostrophe (\\=') by a right quote.
+quotation mark (\\=&lsquo;) and grave accent (\\=`) by a left quote, and each
+right single quotation mark (\\=&rsquo;) and apostrophe (\\=') by a right quote.
 The left and right quote replacement characters are specified by
 `text-quoting-style'.
 
@@ -3849,7 +3849,7 @@ usage: (format-message STRING &rest OBJECTS)  */)
   return styled_format (nargs, args, true);
 }
 
-/* Implement ‘format-message’ if MESSAGE is true, ‘format’ otherwise.  */
+/* Implement `format-message' if MESSAGE is true, `format' otherwise.  */
 
 static Lisp_Object
 styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
