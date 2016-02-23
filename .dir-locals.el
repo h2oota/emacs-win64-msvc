@@ -10,4 +10,10 @@
 		     (bug-reference-url-format . "http://debbugs.gnu.org/%s")
 		     (mode . bug-reference)))
  (diff-mode . ((mode . whitespace)))
- (emacs-lisp-mode . ((indent-tabs-mode . nil))))
+ (emacs-lisp-mode . ((indent-tabs-mode . nil)))
+ (compilation-mode . ((compilation-filter-hook
+                       (lambda ()
+                         (save-excursion
+                           (replace-regexp
+                            "'/\\([a-zA-Z]\\)/\\([^']+\\)'" "\\1:/\\2" nil
+                            compilation-filter-start (point))))))))
