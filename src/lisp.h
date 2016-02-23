@@ -4190,7 +4190,7 @@ extern void syms_of_callproc (void);
 /* Defined in doc.c.  */
 enum text_quoting_style
   {
-    /* Use curved single quotes ‘like this’.  */
+    /* Use curved single quotes &lsquo;like this&rsquo;.  */
     CURVE_QUOTING_STYLE,
 
     /* Use grave accent and apostrophe  `like this'.  */
