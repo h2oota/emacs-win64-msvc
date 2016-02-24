@@ -1242,7 +1242,10 @@ late_LDFLAGS="$LDFLAGS"
 if test x$GCC = xyes; then
   LDFLAGS_NOCOMBRELOC="-Wl,-znocombreloc"
 else
-  LDFLAGS_NOCOMBRELOC="-znocombreloc"
+  case "$CC" in
+    *cl)  LDFLAGS_NOCOMBRELOC="";;
+    *) LDFLAGS_NOCOMBRELOC="-znocombreloc";;
+  esac
 fi
 
 LDFLAGS="$LDFLAGS $LDFLAGS_NOCOMBRELOC"
@@ -1302,7 +1305,7 @@ case "$opsys" in
    UNEXEC_OBJ=unexhp9k800.o
    ;;
   mingw32)
-   UNEXEC_OBJ=unexw32.o
+   UNEXEC_OBJ="unexw32.\$(OBJEXT)"
    ;;
   sol2-10)
    # Use the Solaris dldump() function, called from unexsol.c, to dump
@@ -1401,7 +1404,7 @@ C_SWITCH_SYSTEM=
 ## additional optimization.  --nils@exp-math.uni-essen.de
 test "$opsys" = "aix4.2" && test "x$GCC" != "xyes" && \
   C_SWITCH_SYSTEM="-ma -qmaxmem=4000"
-if test "$opsys" = "mingw32"; then
+if test "$opsys" = "mingw32" && test "$GCC" = yes; then
   case "$canonical" in
     x86_64-*-mingw*) C_SWITCH_SYSTEM="-mtune=generic" ;;
     *) C_SWITCH_SYSTEM="-mtune=pentium4" ;;
@@ -1425,6 +1428,10 @@ case "$opsys" in
 
   ## Motif needs -lgen.
   unixware) LIBS_SYSTEM="-lsocket -lnsl -lelf -lgen" ;;
+
+  mingw*)
+    case $CC in *cl) LIBS_SYSTEM="-ladvapi32 -luser32 -lshell32" ;; esac
+    ;;
 esac
 
 AC_SUBST(LIBS_SYSTEM)
@@ -1936,7 +1943,7 @@ if test "${opsys}" = "mingw32"; then
   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
      #include <windows.h>
      #include <usp10.h>]],
-   [[PIMAGE_NT_HEADERS pHeader;
+   [[PIMAGE_NT_HEADERS pHeader = 0;
      PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pHeader)]])],
    [emacs_cv_w32api=yes
     HAVE_W32=yes],
@@ -1961,8 +1968,8 @@ if test "${HAVE_W32}" = "yes"; then
   fi
   AC_CHECK_TOOL(WINDRES, [windres],
                 [AC_MSG_ERROR([No resource compiler found.])])
-  W32_OBJ="w32fns.o w32menu.o w32reg.o w32font.o w32term.o"
-  W32_OBJ="$W32_OBJ w32xfns.o w32select.o w32uniscribe.o"
+  W32_OBJ="w32fns.\$(OBJEXT) w32menu.\$(OBJEXT) w32reg.\$(OBJEXT) w32font.\$(OBJEXT) w32term.\$(OBJEXT)"
+  W32_OBJ="$W32_OBJ w32xfns.\$(OBJEXT) w32select.\$(OBJEXT) w32uniscribe.\$(OBJEXT)"
   EMACSRES="emacs.res"
   case "$canonical" in
     x86_64-*-*) EMACS_MANIFEST="emacs-x64.manifest" ;;
@@ -1983,13 +1990,13 @@ if test "${HAVE_W32}" = "yes"; then
     W32_RES_LINK="-Wl,emacs.res"
   else
     UPDATE_MANIFEST=update-game-score.exe.manifest
-    W32_OBJ="$W32_OBJ w32.o w32console.o w32heap.o w32inevt.o w32proc.o"
+    W32_OBJ="$W32_OBJ w32.\$(OBJEXT) w32console.\$(OBJEXT) w32heap.\$(OBJEXT) w32inevt.\$(OBJEXT) w32proc.\$(OBJEXT)"
     W32_LIBS="$W32_LIBS -lwinmm -lgdi32 -lcomdlg32"
     W32_LIBS="$W32_LIBS -lmpr -lwinspool -lole32 -lcomctl32 -lusp10"
     W32_RES_LINK="\$(EMACSRES)"
     CLIENTRES="emacsclient.res"
     CLIENTW="emacsclientw\$(EXEEXT)"
-    FIRSTFILE_OBJ=firstfile.o
+    FIRSTFILE_OBJ="firstfile.\$(OBJEXT)"
     NTDIR=nt
     CM_OBJ=
     LIBS_ECLIENT="-lcomctl32"
@@ -2146,7 +2153,7 @@ elif test "$hybrid_malloc" = yes; then
   GMALLOC_OBJ=gmalloc.o
   VMLIMIT_OBJ=
 else
-  test "$doug_lea_malloc" != "yes" && GMALLOC_OBJ=gmalloc.o
+  test "$doug_lea_malloc" != "yes" && GMALLOC_OBJ="gmalloc.\$(OBJEXT)"
   VMLIMIT_OBJ=vm-limit.o
 
   AC_CHECK_HEADERS([sys/vlimit.h])
@@ -2741,7 +2748,7 @@ case $with_file_notification,$opsys in
     AC_CHECK_HEADER(windows.h)
     if test "$ac_cv_header_windows_h" = yes ; then
        AC_DEFINE(HAVE_W32NOTIFY, 1, [Define to 1 to use w32notify.])
-       NOTIFY_OBJ=w32notify.o
+       NOTIFY_OBJ="w32notify.\$(OBJEXT)"
        NOTIFY_SUMMARY="yes (w32)"
     fi ;;
 esac
@@ -3332,7 +3339,10 @@ HAVE_ZLIB=no
 LIBZ=
 if test "${with_zlib}" != "no"; then
   OLIBS=$LIBS
-  AC_SEARCH_LIBS([inflateEnd], [z], [HAVE_ZLIB=yes])
+  case ${with_zlib} in
+    yes) with_zlib=z;;
+  esac
+  AC_SEARCH_LIBS([inflateEnd], [${with_zlib}], [HAVE_ZLIB=yes])
   LIBS=$OLIBS
   case $ac_cv_search_inflateEnd in
     -*) LIBZ=$ac_cv_search_inflateEnd ;;
@@ -3959,7 +3969,7 @@ fail;
 
 esac
 
-TERMCAP_OBJ=tparam.o
+TERMCAP_OBJ="tparam.\$(OBJEXT)"
 if test $TERMINFO = yes; then
   AC_DEFINE(TERMINFO, 1, [Define to 1 if you use terminfo instead of termcap.])
   TERMCAP_OBJ=terminfo.o
@@ -4645,7 +4655,7 @@ if test x$GCC = xyes; then
 else
   case $opsys in
     dnl irix: Tested on Irix 6.5.  SCM worked on earlier versions.
-    aix* | dragonfly | freebsd | netbsd | openbsd | irix6-5 | sol2* )
+    aix* | dragonfly | freebsd | netbsd | openbsd | irix6-5 | sol2* | mingw*)
       AC_DEFINE(GC_SETJMP_WORKS, 1)
       ;;
   esac
@@ -4656,7 +4666,7 @@ AC_CACHE_CHECK([for _setjmp], [emacs_cv_func__setjmp],
   [AC_LINK_IFELSE(
      [AC_LANG_PROGRAM(
        [[#include <setjmp.h>
-         #ifdef __MINGW32__
+         #if defind(__MINGW32__) || defined(_MSC_VER)
          # define _longjmp longjmp
          #endif
        ]],
@@ -5041,7 +5051,7 @@ if test "${REL_ALLOC}" = "yes" ; then
 	    [Define REL_ALLOC if you want to use the relocating allocator for
 	     buffer space.])
 
-  test "$system_malloc" != "yes" && RALLOC_OBJ=ralloc.o
+  test "$system_malloc" != "yes" && RALLOC_OBJ="ralloc.\$(OBJEXT)"
 fi
 AC_SUBST(RALLOC_OBJ)
 
@@ -5053,7 +5063,7 @@ if test "$opsys" = "cygwin"; then
 elif test "$opsys" = "mingw32"; then
   CYGWIN_OBJ=
   PRE_ALLOC_OBJ=
-  POST_ALLOC_OBJ=lastfile.o
+  POST_ALLOC_OBJ="lastfile.\$(OBJEXT)"
 else
   CYGWIN_OBJ=
   PRE_ALLOC_OBJ=lastfile.o
@@ -5154,8 +5164,11 @@ case "$opsys" in
   mingw32)
    ## Is it any better under MinGW64 to relocate emacs into higher addresses?
    case "$canonical" in
-     x86_64-*-*) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x400000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
-     *) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x01000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
+     x86_64-*-*) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x400000000 -Wl,-entry,__start -Wl,-Map,./\$(@:.\$(EXEEXT)=).map -Wl,-subsystem,console,5.02 -Wl,-machine,x64" ;;
+     *) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x01000000 -Wl,-entry,__start -Wl,-Map,./\$(@:.\$(EXEEXT)=).map -Wl,-subsystem,console,5.01 -Wl,-machine,x86" ;;
+   esac
+   case "$CC" in
+     *cl) LD_SWITCH_SYSTEM_TEMACS="-Wl,-dynamicbase,no $LD_SWITCH_SYSTEM_TEMACS";;
    esac
    ;;
 
@@ -5198,7 +5211,7 @@ AC_SUBST(LD_SWITCH_SYSTEM_TEMACS)
 if test "$window_system" != "none"; then
   AC_DEFINE(HAVE_WINDOW_SYSTEM, 1, [Define if you have a window system.])
   AC_DEFINE(POLL_FOR_INPUT, 1, [Define if you poll periodically to detect C-g.])
-  WINDOW_SYSTEM_OBJ="fontset.o fringe.o image.o"
+  WINDOW_SYSTEM_OBJ="fontset.\$(OBJEXT) fringe.\$(OBJEXT) image.\$(OBJEXT)"
 fi
 
 AC_SUBST(WINDOW_SYSTEM_OBJ)

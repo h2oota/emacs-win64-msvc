@@ -25,6 +25,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <stddef.h> /* for offsetof */
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <float.h>	/* for DBL_EPSILON */
 #include <io.h>
 #include <errno.h>
@@ -1675,7 +1676,7 @@ static char startup_dir[MAX_UTF8_PATH];
 
 /* Get the current working directory.  */
 char *
-getcwd (char *dir, int dirsize)
+w32_getcwd (char *dir, int dirsize)
 {
   if (!dirsize)
     {
@@ -2880,7 +2881,7 @@ emacs_root_dir (void)
 
 /* Emulate gettimeofday (Ulrich Leodolter, 1/11/95).  */
 int
-gettimeofday (struct timeval *__restrict tv, struct timezone *__restrict tz)
+gettimeofday (struct timeval *restrict tv, struct timezone *restrict tz)
 {
   struct _timeb tb;
   _ftime (&tb);
@@ -4406,7 +4407,7 @@ sys_rename_replace (const char *oldname, const char *newname, BOOL force)
   /* volume_info is set indirectly by map_w32_filename.  */
   oldname_dev = volume_info.serialnum;
 
-  if (os_subtype == OS_9X)
+  if (os_subtype == OS_SUBTYPE_9X)
     {
       char * o;
       char * p;
@@ -5450,7 +5451,7 @@ fstat (int desc, struct stat * buf)
    files.  */
 
 int
-utime (const char *name, struct utimbuf *times)
+sys_utime (const char *name, struct utimbuf *times)
 {
   struct utimbuf deftime;
   HANDLE fh;
@@ -9210,65 +9211,6 @@ init_ntproc (int dumping)
   if (getenv ("PRELOAD_WINSOCK") != NULL)
     init_winsock (TRUE);
 
-  /* Initial preparation for subprocess support: replace our standard
-     handles with non-inheritable versions. */
-  {
-    HANDLE parent;
-    HANDLE stdin_save =  INVALID_HANDLE_VALUE;
-    HANDLE stdout_save = INVALID_HANDLE_VALUE;
-    HANDLE stderr_save = INVALID_HANDLE_VALUE;
-
-    parent = GetCurrentProcess ();
-
-    /* ignore errors when duplicating and closing; typically the
-       handles will be invalid when running as a gui program. */
-    DuplicateHandle (parent,
-		     GetStdHandle (STD_INPUT_HANDLE),
-		     parent,
-		     &stdin_save,
-		     0,
-		     FALSE,
-		     DUPLICATE_SAME_ACCESS);
-
-    DuplicateHandle (parent,
-		     GetStdHandle (STD_OUTPUT_HANDLE),
-		     parent,
-		     &stdout_save,
-		     0,
-		     FALSE,
-		     DUPLICATE_SAME_ACCESS);
-
-    DuplicateHandle (parent,
-		     GetStdHandle (STD_ERROR_HANDLE),
-		     parent,
-		     &stderr_save,
-		     0,
-		     FALSE,
-		     DUPLICATE_SAME_ACCESS);
-
-    fclose (stdin);
-    fclose (stdout);
-    fclose (stderr);
-
-    if (stdin_save != INVALID_HANDLE_VALUE)
-      _open_osfhandle ((intptr_t) stdin_save, O_TEXT);
-    else
-      _open ("nul", O_TEXT | O_NOINHERIT | O_RDONLY);
-    _fdopen (0, "r");
-
-    if (stdout_save != INVALID_HANDLE_VALUE)
-      _open_osfhandle ((intptr_t) stdout_save, O_TEXT);
-    else
-      _open ("nul", O_TEXT | O_NOINHERIT | O_WRONLY);
-    _fdopen (1, "w");
-
-    if (stderr_save != INVALID_HANDLE_VALUE)
-      _open_osfhandle ((intptr_t) stderr_save, O_TEXT);
-    else
-      _open ("nul", O_TEXT | O_NOINHERIT | O_WRONLY);
-    _fdopen (2, "w");
-  }
-
   /* unfortunately, atexit depends on implementation of malloc */
   /* atexit (term_ntproc); */
   if (!dumping)
@@ -9324,7 +9266,7 @@ shutdown_handler (DWORD type)
 HANDLE
 maybe_load_unicows_dll (void)
 {
-  if (os_subtype == OS_9X)
+  if (os_subtype == OS_SUBTYPE_9X)
     {
       HANDLE ret = LoadLibrary ("Unicows.dll");
       if (ret)

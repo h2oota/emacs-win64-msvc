@@ -344,7 +344,8 @@ AC_DEFUN([AC_C_RESTRICT],
    for ac_kw in __restrict __restrict__ _Restrict restrict; do
      AC_COMPILE_IFELSE(
       [AC_LANG_PROGRAM(
-	 [[typedef int *int_ptr;
+	 [[#undef restrict
+	   typedef int *int_ptr;
 	   int foo (int_ptr $ac_kw ip) { return ip[0]; }
 	   int bar (int [$ac_kw]); /* Catch GCC bug 14050.  */
 	   int bar (int ip[$ac_kw]) { return ip[0]; }

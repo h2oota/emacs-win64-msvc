@@ -1944,6 +1944,11 @@ mallochook (size_t size)
   struct hdr *hdr;
 
   gmalloc_hook = old_malloc_hook;
+/* make sure to rewrite gmalloc_hook */
+#if defined(_MSC_VER) && _MSC_VER >= 1600
+  if (!__malloc_initialized)
+    __malloc_initialize();
+#endif
   hdr = malloc (sizeof *hdr + size + 1);
   gmalloc_hook = mallochook;
   if (hdr == NULL)

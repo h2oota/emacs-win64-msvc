@@ -154,6 +154,8 @@ int __cdecl __MINGW_NOTHROW	stat (const char*, struct stat*);
 int __cdecl __MINGW_NOTHROW	lstat (const char*, struct stat*);
 int __cdecl __MINGW_NOTHROW	fstatat (int, char const *,
 						 struct stat *, int);
+#ifndef _MSC_VER
 int __cdecl __MINGW_NOTHROW	chmod (const char*, int);
+#endif
 
 #endif	/* INC_SYS_STAT_H_ */

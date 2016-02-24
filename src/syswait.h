@@ -29,6 +29,14 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <sys/wait.h>
 #endif  /* !HAVE_SYS_WAIT_H */
 
+#ifndef WNOHANG
+#define WNOHANG 1
+#endif
+
+#ifndef WUNTRACED
+#define WUNTRACED 2
+#endif
+
 #ifndef WCONTINUED
 #define WCONTINUED 8
 #endif

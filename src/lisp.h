@@ -1767,8 +1767,11 @@ CHAR_TABLE_EXTRA_SLOTS (struct Lisp_Char_Table *ct)
 }
 
 /* Make sure that sub char-table contents slot is where we think it is.  */
-verify (offsetof (struct Lisp_Sub_Char_Table, contents)
-	== offsetof (struct Lisp_Vector, contents[SUB_CHAR_TABLE_OFFSET]));
+verify (SUB_CHAR_TABLE_OFFSET  ==
+	((sizeof(struct Lisp_Sub_Char_Table) -
+	  sizeof (((struct Lisp_Sub_Char_Table*)0)->contents)) -
+	 (sizeof(struct Lisp_Vector) -
+	  sizeof (((struct Lisp_Vector*)0)->contents))) / word_size);
 
 /***********************************************************************
 			       Symbols
@@ -3884,7 +3887,7 @@ extern Lisp_Object call5 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Li
 extern Lisp_Object call6 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object call7 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_catch (Lisp_Object, Lisp_Object (*) (Lisp_Object), Lisp_Object);
-extern Lisp_Object internal_lisp_condition_case (Lisp_Object, Lisp_Object, Lisp_Object);
+extern Lisp_Object internal_lisp_condition_case (volatile Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_condition_case (Lisp_Object (*) (void), Lisp_Object, Lisp_Object (*) (Lisp_Object));
 extern Lisp_Object internal_condition_case_1 (Lisp_Object (*) (Lisp_Object), Lisp_Object, Lisp_Object, Lisp_Object (*) (Lisp_Object));
 extern Lisp_Object internal_condition_case_2 (Lisp_Object (*) (Lisp_Object, Lisp_Object), Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object (*) (Lisp_Object));

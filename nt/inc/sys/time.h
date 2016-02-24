@@ -18,10 +18,12 @@ struct timeval
   long		tv_usec;	/* microseconds */
 };
 #define timerisset(tvp)  ((tvp)->tv_sec || (tvp)->tv_usec)
+#if !defined(_MSC_VER) || _MSC_VER < 1900
 #define timercmp(tvp, uvp, cmp) \
         (((tvp)->tv_sec != (uvp)->tv_sec) ? \
         ((tvp)->tv_sec cmp (uvp)->tv_sec) : \
         ((tvp)->tv_usec cmp (uvp)->tv_usec))
+#endif
 #define timerclear(tvp)  (tvp)->tv_sec = (tvp)->tv_usec = 0
 #endif /* _TIMEVAL_DEFINED */
 
@@ -42,7 +44,7 @@ struct timezone
    which does not force the use of -std= switch to GCC, and that
    causes compilation errors with 'restrict', which is a C99
    extension.  */
-int gettimeofday (struct timeval *__restrict, struct timezone *__restrict);
+int gettimeofday (struct timeval *restrict, struct timezone *restrict);
 
 #define ITIMER_REAL      0
 #define ITIMER_PROF      1
@@ -59,4 +61,3 @@ int setitimer (int, struct itimerval *, struct itimerval *);
 #endif /* SYS_TIME_H_INCLUDED */
 
 /* end of sys/time.h */
-

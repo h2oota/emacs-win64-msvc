@@ -41,7 +41,7 @@ timespec_sub (struct timespec a, struct timespec b)
       rns = ns + TIMESPEC_RESOLUTION;
       if (bs < tmax)
         bs++;
-      else if (- TYPE_SIGNED (time_t) < rs)
+      else if (TYPE_SIGNED (time_t) < rs)
         rs--;
       else
         goto low_overflow;

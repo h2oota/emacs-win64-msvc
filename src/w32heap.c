@@ -215,10 +215,11 @@ dumped_data_commit (PVOID Base, PVOID *CommitAddress, PSIZE_T CommitSize)
 /* We want to turn on Low Fragmentation Heap for XP and older systems.
    MinGW32 lacks those definitions.  */
 #ifndef MINGW_W64
+#if _WIN32_WINNT < _WIN32_WINNT_WINXP
 typedef enum _HEAP_INFORMATION_CLASS {
   HeapCompatibilityInformation
 } HEAP_INFORMATION_CLASS;
-
+#endif
 typedef WINBASEAPI BOOL (WINAPI * HeapSetInformation_Proc)(HANDLE,HEAP_INFORMATION_CLASS,PVOID,SIZE_T);
 #endif
 
@@ -258,7 +259,7 @@ init_heap (void)
 	}
 #endif
 
-      if (os_subtype == OS_9X)
+      if (os_subtype == OS_SUBTYPE_9X)
         {
           the_malloc_fn = malloc_after_dump_9x;
           the_realloc_fn = realloc_after_dump_9x;
@@ -301,7 +302,7 @@ init_heap (void)
 	}
       heap = s_pfn_Rtl_Create_Heap (0, data_region_base, 0, 0, NULL, &params);
 
-      if (os_subtype == OS_9X)
+      if (os_subtype == OS_SUBTYPE_9X)
         {
           fprintf (stderr, "Cannot dump Emacs on Windows 9X; exiting.\n");
           exit (-1);
@@ -702,14 +703,14 @@ mmap_realloc (void **var, size_t nbytes)
     }
 
   memset (&memInfo, 0, sizeof (memInfo));
-  if (VirtualQuery (*var, &memInfo, sizeof (memInfo)) == 0)
+  if (VirtualQuery (*(char **)var, &memInfo, sizeof (memInfo)) == 0)
     DebPrint (("mmap_realloc: VirtualQuery error = %ld\n", GetLastError ()));
 
   /* We need to enlarge the block.  */
   if (memInfo.RegionSize < nbytes)
     {
       memset (&m2, 0, sizeof (m2));
-      if (VirtualQuery (*var + memInfo.RegionSize, &m2, sizeof(m2)) == 0)
+      if (VirtualQuery (*(char **)var + memInfo.RegionSize, &m2, sizeof(m2)) == 0)
         DebPrint (("mmap_realloc: VirtualQuery error = %ld\n",
 		   GetLastError ()));
       /* If there is enough room in the current reserved area, then
@@ -719,7 +720,7 @@ mmap_realloc (void **var, size_t nbytes)
 	{
 	  void *p;
 
-	  p = VirtualAlloc (*var + memInfo.RegionSize,
+	  p = VirtualAlloc (*(char **)var + memInfo.RegionSize,
 			    nbytes - memInfo.RegionSize,
 			    MEM_COMMIT, PAGE_READWRITE);
 	  if (!p /* && GetLastError() != ERROR_NOT_ENOUGH_MEMORY */)
@@ -779,7 +780,7 @@ mmap_realloc (void **var, size_t nbytes)
         }
 
       /* We still can decommit pages.  */
-      if (VirtualFree (*var + nbytes + get_page_size(),
+      if (VirtualFree (*(char **)var + nbytes + get_page_size(),
 		       memInfo.RegionSize - nbytes - get_page_size(),
 		       MEM_DECOMMIT) == 0)
         DebPrint (("mmap_realloc: VirtualFree error %ld\n", GetLastError ()));

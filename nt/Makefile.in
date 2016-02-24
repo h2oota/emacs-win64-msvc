@@ -153,8 +153,10 @@ EMACSRES = @EMACSRES@
 EMACS_MANIFEST = @EMACS_MANIFEST@
 WINDRES = @WINDRES@
 
+LIBS_SYSTEM=@LIBS_SYSTEM@
+LIBS=$(LIBS_SYSTEM)
 ## Extra libraries to use when linking addpm.
-LIBS_ADDPM = -lole32 -luuid
+LIBS_ADDPM = -lole32 -luuid $(LIBS)
 
 ## Compilation and linking flags
 BASE_CFLAGS = $(C_SWITCH_SYSTEM) $(C_SWITCH_MACHINE) \
@@ -243,13 +245,13 @@ addpm${EXEEXT}: ${srcdir}/addpm.c ../src/epaths.h
 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< $(LIBS_ADDPM) -o $@
 
 ddeclient${EXEEXT}: ${srcdir}/ddeclient.c
-	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< -o $@
+	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< $(LIBS) -o $@
 
-cmdproxy${EXEEXT}: ${srcdir}/cmdproxy.c
-	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< -o $@
+cmdproxy${EXEEXT}: ${srcdir}/cmdproxy.c ${srcdir}/snprintf.c
+	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $^ $(LIBS) -o $@
 
 runemacs${EXEEXT}: ${srcdir}/runemacs.c $(EMACSRES)
-	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $^ -mwindows -o $@
+	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $^ $(LIBS) -mwindows -o $@
 
 ## Also used in ../src/Makefile.
 emacs.res ../src/emacs.res: emacs.rc ${srcdir}/icons/emacs.ico \

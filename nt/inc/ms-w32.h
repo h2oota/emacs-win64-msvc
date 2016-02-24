@@ -36,6 +36,17 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 # endif
 #endif
 
+#ifdef _MSC_VER
+#define STDIN_FILENO  0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
+#define ALIGN_STACK
+#define _ANONYMOUS_UNION
+#define DUMMYUNIONNAME
+#define R_OK 4
+#define F_OK 0
+#endif
+
 /* #undef const */
 
 /* Number of chars of output in the buffer of a stdio stream. */
@@ -108,19 +119,20 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #define inline __inline
 #endif
 
-#ifdef __GNUC__
+#ifndef restrict
+# ifdef __GNUC__
 /* config.h may have defined already.  */
-# ifndef restrict
 #  define restrict __restrict__
-# endif
-#else
+# else
   /* FIXME: should we define to __restrict, which MSVC supports? */
-# define restrict
+#  define restrict
+# endif
 #endif
 
 /* `mode_t' is not defined for MSVC. Define. */
 #ifdef _MSC_VER
 typedef unsigned short mode_t;
+typedef unsigned short _mode_t;
 #endif
 
 /* A va_copy replacement for MSVC.  */
@@ -145,8 +157,10 @@ extern char *getenv ();
    versions we still support.  MinGW64 defines this to a higher value
    in its system headers, and is not really compatible with values
    lower than 0x0500, so leave it alone.  */
-#ifndef MINGW_W64
-# define _WIN32_WINNT 0x0400
+#ifdef _WIN64
+# define _WIN32_WINNT 0x0502 /* Xp64 */
+#else
+# define _WIN32_WINNT 0x0501 /* Xp */
 #endif
 
 /* Make a leaner executable.  */
@@ -207,9 +221,11 @@ extern void w32_reset_stack_overflow_guard (void);
 #include <signal.h>
 
 /* MSVC gets link-time errors without these redirections.  */
+#if _MSC_VER < 1900
 #define fstat(a, b) sys_fstat(a, b)
 #define stat(a, b)  sys_stat(a, b)
 #define utime       sys_utime
+#endif
 #endif
 
 /* Calls that are emulated or shadowed.  */
@@ -228,7 +244,9 @@ extern void w32_reset_stack_overflow_guard (void);
 #define dup2    sys_dup2
 #define fopen   sys_fopen
 #define link    sys_link
+#ifndef _MSC_VER
 #define localtime sys_localtime
+#endif
 #define mkdir   sys_mkdir
 #undef open
 #define open    sys_open
@@ -250,10 +268,21 @@ extern void w32_reset_stack_overflow_guard (void);
 #define readdir sys_readdir
 #undef seekdir
 #define seekdir sys_seekdir
+#define utime sys_utime
 /* This prototype is needed because some files include config.h
    _after_ the standard headers, so sys_unlink gets no prototype from
    stdio.h or io.h.  */
 extern int sys_unlink (const char *);
+extern int sys_chdir (const char *);
+extern int sys_dup2 (int, int);
+extern int sys_write (int, const void *, unsigned int);
+extern int sys_open (const char *, int, int);
+extern int sys_close (int);
+extern int sys_read (int, char *, unsigned int);
+extern int sys_mkdir (const char *);
+extern int sys_rmdir (const char *);
+extern int sys_chmod (const char *, int);
+extern int sys_utime (const char *, struct utimbuf *);
 #undef write
 #define write   sys_write
 #undef umask
@@ -282,6 +311,19 @@ extern int sys_umask (int);
 #endif /* emacs */
 
 /* Map to MSVC names.  */
+#ifdef emacs
+char *w32_getcwd (char *, int);
+#define getcwd    w32_getcwd
+#else
+#define getcwd    _getcwd
+#define write     _write
+#define setmode   _setmode
+#define unlink   _unlink
+#define read     _read
+#define open     _open
+#define close    _close
+#define chdir    _chdir
+#endif
 #define execlp    _execlp
 #define execvp    _execvp
 #define fdatasync _commit
@@ -289,7 +331,7 @@ extern int sys_umask (int);
 #define fsync	  _commit
 #define ftruncate _chsize
 #define getpid    _getpid
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER < 1900
 typedef int pid_t;
 #define snprintf  _snprintf
 #define strtoll   _strtoi64
@@ -363,7 +405,7 @@ extern struct tm *localtime_r (time_t const * restrict, struct tm * restrict);
 #define NSIG 23
 #endif
 
-#ifndef ENOTSUP
+#if !defined(ENOTSUP) && (!defined(_MSC_VER) || _MSC_VER < 1900)
 #define ENOTSUP ENOSYS
 #endif
 
@@ -374,7 +416,9 @@ extern struct tm *localtime_r (time_t const * restrict, struct tm * restrict);
 
 #ifdef _MSC_VER
 typedef int sigset_t;
+#if _MSC_VER < 1900
 typedef int ssize_t;
+#endif
 #endif
 
 #ifdef MINGW_W64
@@ -410,6 +454,10 @@ extern int sigismember (const sigset_t *, int);
 extern int setpgrp (int, int);
 extern int sigaction (int, const struct sigaction *, struct sigaction *);
 extern int alarm (int);
+
+extern pid_t waitpid (pid_t, int *, int);
+extern unsigned getegid (void);
+extern unsigned getgid (void);
 
 extern int sys_kill (pid_t, int);
 
@@ -499,7 +547,6 @@ extern void * memrchr (void const *, int, size_t);
 
 extern int mkostemp (char *, int);
 
-
 #if defined (__MINGW32__)
 
 /* Define to 1 if the system has the type `long long int'. */
@@ -519,8 +566,10 @@ extern int mkostemp (char *, int);
 typedef __int64 EMACS_INT;
 typedef unsigned __int64 EMACS_UINT;
 #  define EMACS_INT_MAX	          LLONG_MAX
-#  define PRIuMAX                 "llu"
-#  define pI			  "ll"
+#  define PRIuMAX                 "I64u"
+#  define pI			  "I64"
+#  define PRIdMAX		  "I64d"
+#  define PRIxMAX		  "I64x"
 /* Fix a bug in MSVC headers : stdint.h */
 #  define _INTPTR 2
 # elif defined(_WIN32)
@@ -533,14 +582,17 @@ typedef unsigned __int64 EMACS_UINT;
 typedef __int64 EMACS_INT;
 typedef unsigned __int64 EMACS_UINT;
 #   define EMACS_INT_MAX           LLONG_MAX
-#   define PRIuMAX                 "llu"
-#   define pI			  "I64"
+#   define PRIuMAX                 "I64u"
+#   define pI			   "I64"
+#   define PRIdMAX                 "I64d"
 #  else
 typedef int EMACS_INT;
 typedef unsigned int EMACS_UINT;
 #   define EMACS_INT_MAX           LONG_MAX
-#   define PRIuMAX                 "lu"
-#   define pI			  "l"
+#   define PRIuMAX                 "I32u"
+#   define pI			  "I32"
+#   define PRIdMAX                "I32d"
+#   define PRIxMAX		  "I32x"
 #  endif
 # endif
 #endif

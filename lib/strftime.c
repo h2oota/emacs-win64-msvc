@@ -839,7 +839,11 @@ strftime_case_ (bool upcase, STREAM_OR_CHAR_T *s,
             *u = '\0';
             len = strftime (ubuf, sizeof ubuf, ufmt, tp);
             if (len != 0)
+#ifdef _MSC_VER
+              cpy (strlen(ubuf) - 1, ubuf + 1); // msvc returns length in wchat_t
+#else
               cpy (len - 1, ubuf + 1);
+#endif
           }
           break;
 #endif

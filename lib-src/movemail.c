@@ -80,8 +80,10 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #ifdef WINDOWSNT
 #include "ntlib.h"
+#if !defined(_MSC_VER) && _MSC_VER < 1900
 #undef access
 #undef unlink
+#endif
 #define fork() 0
 #define waitpid(child, var, flags) (*(var) = 0)
 /* Unfortunately, Samba doesn't seem to properly lock Unix files even

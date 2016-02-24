@@ -1,0 +1,152 @@
+diff --git a/build-aux/compile.orig b/build-aux/compile
+index fadacbc..70b1eed 100644
+--- a/build-aux/compile.orig
++++ b/build-aux/compile
+@@ -132,6 +132,7 @@ func_cl_wrapper ()
+   # Assume a capable shell
+   lib_path=
+   shared=:
++  manifest=
+   linker_opts=
+   for arg
+   do
+@@ -148,9 +149,18 @@ func_cl_wrapper ()
+ 	      set x "$@" -Fo"$file"
+ 	      shift
+ 	      ;;
++	    *.[Dd][Ll][Ll])
++	      func_file_conv "$2"
++	      liker_opts="$linker_opts -manifest"
++	      set x "$@" -Fe"$file"
++	      manifest="-manifest ${file}.manifest -outputresource:${file};#2"
++	      shift
++	      ;;
+ 	    *)
+ 	      func_file_conv "$2"
++	      linker_opts="$linker_opts -manifest"
+ 	      set x "$@" -Fe"$file"
++	      manifest="-manifest ${file%.[Ee][Xx][eE]}.exe.manifest -outputresource:${file%.[Ee][Xx][eE]}.exe;#1"
+ 	      shift
+ 	      ;;
+ 	  esac
+@@ -189,12 +199,23 @@ func_cl_wrapper ()
+ 	  ;;
+ 	-Wl,*)
+ 	  arg=${1#-Wl,}
+-	  save_ifs="$IFS"; IFS=','
+-	  for flag in $arg; do
++	  case $arg in
++          -stack,* | -heap,* | -entry,* | -Map,* | -dynamicbase,* | -subsystem,* | -machine,*)
++	      linker_opts="$linker_opts ${arg%%,*}:${arg#*,}"
++	    ;;
++          -image-base,*)
++	      arg="${arg#-image}"
++	      linker_opts="$linker_opts ${arg%%,*}:${arg#*,}"
++	    ;;
++	  *)
++	    save_ifs="$IFS"; IFS=','
++	    for flag in $arg; do
++	      IFS="$save_ifs"
++	      linker_opts="$linker_opts $flag"
++	    done
+ 	    IFS="$save_ifs"
+-	    linker_opts="$linker_opts $flag"
+-	  done
+-	  IFS="$save_ifs"
++	    ;;
++	  esac
+ 	  ;;
+ 	-Xlinker)
+ 	  eat=1
+@@ -225,10 +246,78 @@ func_cl_wrapper ()
+   if test -n "$linker_opts"; then
+     linker_opts="-link$linker_opts"
+   fi
++  test -n "$manifest" && "$@" $linker_opts && exec mt -nologo $manifest
+   exec "$@" $linker_opts
+   exit 1
+ }
+ 
++# func_rc_wrapper rc arg...
++# Adjust compile command to suit rc
++func_rc_wrapper ()
++{
++  for arg
++  do
++    if test -n "$eat"; then
++      eat=
++    else
++      case $1 in
++	-o)
++	  # configure might choose to run compile as 'compile cc -o foo foo.c'.
++	  eat=1
++	  func_file_conv "$2" mingw
++	  set x "$@" -Fo"$file"
++	  shift
++	  ;;
++	-O) # ignore
++	  eat=1
++	  ;;
++	-I)
++	  eat=1
++	  func_file_conv "$2" mingw
++	  set x "$@" -I"$file"
++	  shift
++	  ;;
++	-I*)
++	  func_file_conv "${1#-I}" mingw
++	  set x "$@" -I"$file"
++	  shift
++	  ;;
++	--include-dir=*)
++	  func_file_conv "${1#--include-dir=}" mingw
++	  set x "$@" -I "$file"
++	  shift
++          ;;
++	*)
++	  set x "$@" "$1"
++	  shift
++	  ;;
++      esac
++    fi
++    shift
++  done
++  exec "$@"
++  exit 1
++}
++
++# func_ar_wrapper ar arg...
++# Adjust compile command to suit lib
++func_ar_wrapper ()
++{
++  op="$2"
++  libfile="$3"
++  shift 3
++  case $op in
++  *r* | *q*) lib -nologo -out:$libfile "$@" || exit 1;;
++  *t*) lib -nologo -list $libfile || exit 1;;
++  *x*)
++    for f in $(lib -nologo -list $libfile); do
++      lib -nologo -verbose -extract:$f $libfile || exit 1
++    done
++    ;;
++  esac
++  exit 0
++}
++
+ eat=
+ 
+ case $1 in
+@@ -258,6 +347,12 @@ EOF
+   cl | *[/\\]cl | cl.exe | *[/\\]cl.exe )
+     func_cl_wrapper "$@"      # Doesn't return...
+     ;;
++  rc)
++    func_rc_wrapper "$@"      # Doesn't return...
++    ;;
++  ar)
++    func_ar_wrapper "$@"      # Doesn't return...
++    ;;
+ esac
+ 
+ ofile=

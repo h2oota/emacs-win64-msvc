@@ -72,9 +72,13 @@ count_one_bits_32 (unsigned int x)
 /* While gcc falls back to its own generic code if the machine
    on which it's running doesn't support popcount, with Microsoft's
    compiler we need to detect and fallback ourselves.  */
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#include <intrin.h>
+#else
 #  pragma intrinsic __cpuid
 #  pragma intrinsic __popcnt
 #  pragma intrinsic __popcnt64
+#endif
 
 /* Return nonzero if popcount is supported.  */
 

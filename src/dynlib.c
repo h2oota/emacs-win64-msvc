@@ -133,7 +133,7 @@ dynlib_addr (void *addr, const char **fname, const char **symname)
   char mfn_a[MAX_PATH];
 
   /* Step 1: Find the handle of the module where ADDR lives.  */
-  if (os_subtype == OS_9X
+  if (os_subtype == OS_SUBTYPE_9X
       /* Windows NT family version before XP (v5.1).  */
       || ((w32_major_version + (w32_minor_version > 0)) < 6))
     {

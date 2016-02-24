@@ -37,6 +37,7 @@ CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
 EXEEXT = @EXEEXT@
+OBJEXT = @OBJEXT@
 version = @version@
 # Substitute an assignment for the MAKE variable, because
 # BSD doesn't have it as a default.
@@ -376,11 +377,11 @@ ALL_CFLAGS=-Demacs $(MYCPPFLAGS) -I. -I$(srcdir) \
   $(WARN_CFLAGS) $(WERROR_CFLAGS) $(CFLAGS)
 ALL_OBJC_CFLAGS=$(ALL_CFLAGS) $(GNU_OBJC_CFLAGS)
 
-.SUFFIXES: .m
-.c.o:
+.SUFFIXES: .m .$(OBJEXT)
+.c.$(OBJEXT):
 	@$(MKDEPDIR)
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_CFLAGS) $(PROFILING_CFLAGS) $<
-.m.o:
+.m.$(OBJEXT):
 	@$(MKDEPDIR)
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_OBJC_CFLAGS) $(PROFILING_CFLAGS) $<
 
@@ -405,6 +406,7 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o \
 	$(SHEAP_OBJ) \
 	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(CYGWIN_OBJ) $(FONT_OBJ) \
 	$(W32_OBJ) $(WINDOW_SYSTEM_OBJ) $(XGSELOBJ)
+base_obj ::= $(base_obj:.o=.$(OBJEXT))
 obj = $(base_obj) $(NS_OBJC_OBJ)
 
 ## Object files used on some machine or other.
@@ -419,7 +421,7 @@ SOME_MACHINE_OBJECTS = dosfns.o msdos.o \
   w32menu.o w32proc.o w32reg.o w32select.o w32term.o w32xfns.o \
   w16select.o widget.o xfont.o ftfont.o xftfont.o ftxfont.o gtkutil.o \
   xsettings.o xgselect.o termcap.o
-
+SOME_MACHINE_OBJECTS ::= $(SOME_MACHINE_OBJECTS:.o=.$(OBJEXT))
 ## gmalloc.o if !SYSTEM_MALLOC && !DOUG_LEA_MALLOC, else empty.
 GMALLOC_OBJ=@GMALLOC_OBJ@
 
@@ -557,7 +559,7 @@ $(etc)/DOC: lisp.mk $(libsrc)/make-docfile$(EXEEXT) $(obj) $(lisp)
 	$(AM_V_GEN)$(MKDIR_P) $(etc)
 	-$(AM_V_at)rm -f $(etc)/DOC
 	$(AM_V_at)$(libsrc)/make-docfile -d $(srcdir) \
-	  $(SOME_MACHINE_OBJECTS) $(obj) > $(etc)/DOC
+	  $(SOME_MACHINE_OBJECTS) $(obj) > $(etc)/DOC || { rm -f $(etc)/DOC; exit 1; }
 	$(AM_V_at)$(libsrc)/make-docfile -a $(etc)/DOC -d $(lispsource) \
 	  $(shortlisp)
 
@@ -571,7 +573,7 @@ buildobj.h: Makefile
 	done >$@.tmp
 	$(AM_V_at)mv $@.tmp $@
 
-GLOBAL_SOURCES = $(base_obj:.o=.c) $(NS_OBJC_OBJ:.o=.m)
+GLOBAL_SOURCES = $(base_obj:.$(OBJEXT)=.c) $(NS_OBJC_OBJ:.$(OBJEXT)=.m)
 
 AM_V_GLOBALS = $(am__v_GLOBALS_@AM_V@)
 am__v_GLOBALS_ = $(am__v_GLOBALS_@AM_DEFAULT_V@)
@@ -626,7 +628,7 @@ $(top_srcdir)/aclocal.m4 $(top_srcdir)/configure config.in ../config.status \
   Makefile:
 	$(MAKE) -C .. am--refresh
 
-doc.o: buildobj.h
+doc.$(OBJEXT): buildobj.h
 
 emacs.res: FORCE
 	$(MAKE) -C ../nt ../src/emacs.res
@@ -639,7 +641,7 @@ ns-app: emacs$(EXEEXT)
 .PHONY: versionclean extraclean
 
 mostlyclean:
-	rm -f temacs$(EXEEXT) core *.core \#* *.o
+	rm -f temacs$(EXEEXT) core *.core \#* *.$(OBJEXT)
 	rm -f ../etc/DOC
 	rm -f bootstrap-emacs$(EXEEXT) emacs-$(version)$(EXEEXT)
 	rm -f buildobj.h
@@ -751,7 +753,7 @@ endif
 	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
 
 ifeq ($(AUTO_DEPEND),yes)
--include $(ALLOBJS:%.o=${DEPDIR}/%.d)
+-include $(ALLOBJS:%.$(OBJEXT)=${DEPDIR}/%.d)
 else
 include $(srcdir)/deps.mk
 endif

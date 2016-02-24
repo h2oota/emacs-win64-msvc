@@ -78,7 +78,7 @@ DWORD_PTR  extra_bss_size_static = 0;
 /* MinGW64 doesn't add a leading underscore to external symbols,
    whereas configure.ac sets up LD_SWITCH_SYSTEM_TEMACS to force the
    entry point at __start, with two underscores.  */
-#ifdef __MINGW64__
+#if defined(__MINGW64__) || defined(_WIN64)
 #define _start __start
 #endif
 
@@ -491,8 +491,8 @@ copy_executable_and_dump_data (file_data *p_infile,
     if (verbose)								\
       {										\
 	printf ("%s\n", (message));						\
-	printf ("\t0x%08x Offset in input file.\n", s - p_infile->file_base); 	\
-	printf ("\t0x%08x Offset in output file.\n", dst - p_outfile->file_base); \
+	printf ("\t0x%08x Offset in input file.\n", (int)(s - p_infile->file_base)); \
+	printf ("\t0x%08x Offset in output file.\n", (int)(dst - p_outfile->file_base)); \
 	printf ("\t0x%08x Size in bytes.\n", count);				\
       }										\
     memcpy (dst, s, count);							\
@@ -508,9 +508,9 @@ copy_executable_and_dump_data (file_data *p_infile,
 	printf ("%s\n", (message));						\
 	printf ("\t0x%p Address in process.\n", s);				\
 	printf ("\t0x%p Base       output file.\n", p_outfile->file_base); \
-	printf ("\t0x%p Offset  in output file.\n", dst - p_outfile->file_base); \
+	printf ("\t0x%0*zx Offset  in output file.\n", (int)sizeof(ptrdiff_t), dst - p_outfile->file_base); \
 	printf ("\t0x%p Address in output file.\n", dst); \
-	printf ("\t0x%p Size in bytes.\n", count);				\
+	printf ("\t0x%0*lx Size in bytes.\n", (int)sizeof(ptrdiff_t), count); \
       }										\
     memcpy (dst, s, count);							\
     dst += count;								\

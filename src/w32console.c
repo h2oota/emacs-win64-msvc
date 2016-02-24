@@ -752,7 +752,7 @@ initialize_w32_display (struct terminal *term, int *width, int *height)
       *width = 1 + info.srWindow.Right - info.srWindow.Left;
     }
 
-  if (os_subtype == OS_NT)
+  if (os_subtype == OS_SUBTYPE_NT)
     w32_console_unicode_input = 1;
   else
     w32_console_unicode_input = 0;

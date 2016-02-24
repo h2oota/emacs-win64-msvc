@@ -17,7 +17,21 @@ AC_DEFUN([gt_TYPE_SSIZE_T],
             return !x;]])],
        [gt_cv_ssize_t=yes], [gt_cv_ssize_t=no])])
   if test $gt_cv_ssize_t = no; then
-    AC_DEFINE([ssize_t], [int],
+    case $CC in
+    *cl)
+        AC_COMPILE_IFELSE(
+               [AC_LANG_PROGRAM(
+                  [[#include <stdint.h>]],
+                  [[int x[sizeof(size_t) == sizeof(__int64) ? 1 : -1];]])],
+               [AC_DEFINE([ssize_t], [__int64],
+                  [Define as a signed type of the same size as size_t.])],
+               [AC_DEFINE([ssize_t], [int],
+                  [Define as a signed type of the same size as size_t.])])
+        ;;
+    *)
+        AC_DEFINE([ssize_t], [int],
               [Define as a signed type of the same size as size_t.])
+        ;;
+    esac
   fi
 ])

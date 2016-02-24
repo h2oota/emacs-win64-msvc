@@ -21,7 +21,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "sysstdio.h"
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 #include "lisp.h"
 #include "termchar.h"

@@ -21,6 +21,10 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <windows.h>
+#ifdef _MSC_VER
+typedef unsigned short mode_t;
+typedef unsigned short _mode_t;
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>

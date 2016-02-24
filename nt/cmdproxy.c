@@ -37,6 +37,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* We don't want to include stdio.h because we are already duplicating
    lots of it here */
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#define _snprintf msvc_snprintf
+#endif
 extern int _snprintf (char *buffer, size_t count, const char *format, ...);
 
 /*******  Mock C library routines  *********************************/

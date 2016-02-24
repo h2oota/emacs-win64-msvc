@@ -99,7 +99,7 @@ rpl_tzset (void)
    causes problems.  */
 
 int
-gettimeofday (struct timeval *restrict tv, void *restrict tz)
+gettimeofday (struct timeval *restrict tv, struct timezone *restrict tz)
 {
 #undef gettimeofday
 #if HAVE_GETTIMEOFDAY
@@ -112,14 +112,14 @@ gettimeofday (struct timeval *restrict tv, void *restrict tz)
 # if defined timeval /* 'struct timeval' overridden by gnulib?  */
 #  undef timeval
   struct timeval otv;
-  int result = gettimeofday (&otv, (struct timezone *) tz);
+  int result = gettimeofday (&otv, tz);
   if (result == 0)
     {
       tv->tv_sec = otv.tv_sec;
       tv->tv_usec = otv.tv_usec;
     }
 # else
-  int result = gettimeofday (tv, (struct timezone *) tz);
+  int result = gettimeofday (tv, tz);
 # endif
 
 # if GETTIMEOFDAY_CLOBBERS_LOCALTIME

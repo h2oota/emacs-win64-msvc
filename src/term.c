@@ -2732,7 +2732,7 @@ tty_menu_make_room (tty_menu *menu)
 				allocated * sizeof *menu->submenu);
       menu->panenumber = xrealloc (menu->panenumber,
 				   allocated * sizeof *menu->panenumber);
-      menu->help_text = xrealloc (menu->help_text,
+      menu->help_text = xrealloc ((void *)menu->help_text,
 				  allocated * sizeof *menu->help_text);
       menu->allocated = allocated;
     }
@@ -3365,7 +3365,7 @@ tty_menu_destroy (tty_menu *menu)
       xfree (menu->text);
       xfree (menu->submenu);
       xfree (menu->panenumber);
-      xfree (menu->help_text);
+      xfree ((void *)menu->help_text);
     }
   xfree (menu);
   menu_help_message = prev_menu_help_message = NULL;

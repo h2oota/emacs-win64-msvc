@@ -6253,7 +6253,7 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
   /* When "mouse trails" are in effect, moving the mouse cursor
      sometimes leaves behind an annoying "ghost" of the pointer.
      Avoid that by momentarily switching off mouse trails.  */
-  if (os_subtype == OS_NT
+  if (os_subtype == OS_SUBTYPE_NT
       && w32_major_version + w32_minor_version >= 6)
     ret = SystemParametersInfo (SPI_GETMOUSETRAILS, 0, &trail_num, 0);
   SetCursorPos (pt.x, pt.y);

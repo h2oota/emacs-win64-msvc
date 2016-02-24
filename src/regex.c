@@ -30,6 +30,9 @@
 #if defined _AIX && !defined REGEX_MALLOC
   #pragma alloca
 #endif
+#if _MSC_VER
+#pragma warning(disable : 4090)
+#endif
 
 /* Ignore some GCC warnings for now.  This section should go away
    once the Emacs and Gnulib regex code is merged.  */
@@ -534,8 +537,8 @@ typedef re_char const_re_char;
 typedef char boolean;
 
 static regoff_t re_match_2_internal (struct re_pattern_buffer *bufp,
-				     re_char *string1, size_t size1,
-				     re_char *string2, size_t size2,
+				     const_re_char *string1, size_t size1,
+				     const_re_char *string2, size_t size2,
 				     ssize_t pos,
 				     struct re_registers *regs,
 				     ssize_t stop);
@@ -712,7 +715,7 @@ typedef enum
   ((destination) = extract_number (source))
 
 static int
-extract_number (re_char *source)
+extract_number (const_re_char *source)
 {
   unsigned leading_byte = SIGN_EXTEND_CHAR (source[1]);
   return (leading_byte << 8) + source[0];
@@ -1618,7 +1621,7 @@ do {									\
 
 /* Subroutine declarations and macros for regex_compile.  */
 
-static reg_errcode_t regex_compile (re_char *pattern, size_t size,
+static reg_errcode_t regex_compile (const_re_char *pattern, size_t size,
 				    reg_syntax_t syntax,
 				    struct re_pattern_buffer *bufp);
 static void store_op1 (re_opcode_t op, unsigned char *loc, int arg);
@@ -1627,12 +1630,12 @@ static void insert_op1 (re_opcode_t op, unsigned char *loc,
 			int arg, unsigned char *end);
 static void insert_op2 (re_opcode_t op, unsigned char *loc,
 			int arg1, int arg2, unsigned char *end);
-static boolean at_begline_loc_p (re_char *pattern, re_char *p,
+static boolean at_begline_loc_p (const_re_char *pattern, const_re_char *p,
 				 reg_syntax_t syntax);
-static boolean at_endline_loc_p (re_char *p, re_char *pend,
+static boolean at_endline_loc_p (const_re_char *p, const_re_char *pend,
 				 reg_syntax_t syntax);
-static re_char *skip_one_char (re_char *p);
-static int analyze_first (re_char *p, re_char *pend,
+static re_char *skip_one_char (const_re_char *p);
+static int analyze_first (const_re_char *p, const_re_char *pend,
 			  char *fastmap, const int multibyte);
 
 /* Fetch the next character in the uncompiled pattern, with no
@@ -4502,7 +4505,7 @@ WEAK_ALIAS (__re_search_2, re_search_2)
 
 /* Declarations and macros for re_match_2.  */
 
-static int bcmp_translate (re_char *s1, re_char *s2,
+static int bcmp_translate (const_re_char *s1, const_re_char *s2,
 			   register ssize_t len,
 			   RE_TRANSLATE_TYPE translate,
 			   const int multibyte);

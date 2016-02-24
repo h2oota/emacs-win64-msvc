@@ -1131,7 +1131,7 @@ globals_of_w32select (void)
   QANSICP = coding_from_cp (ANSICP);
   QOEMCP = coding_from_cp (OEMCP);
 
-  if (os_subtype == OS_NT)
+  if (os_subtype == OS_SUBTYPE_NT)
     Vselection_coding_system = QUNICODE;
   else if (inhibit_window_system)
     Vselection_coding_system = QOEMCP;

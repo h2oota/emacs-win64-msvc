@@ -51,6 +51,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #endif
 
 #ifdef WINDOWSNT
+#include "w32.h"
 #define read sys_read
 #define write sys_write
 #ifndef STDERR_FILENO
@@ -2149,7 +2150,7 @@ get_random (void)
   return val & INTMASK;
 }
 
-#ifndef HAVE_SNPRINTF
+#if !defined(HAVE_SNPRINTF) && !defined(_MSC_VER) && _MSC_VER < 1900
 /* Approximate snprintf as best we can on ancient hosts that lack it.  */
 int
 snprintf (char *buf, size_t bufsize, char const *format, ...)

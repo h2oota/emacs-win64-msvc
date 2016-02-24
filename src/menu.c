@@ -606,17 +606,17 @@ free_menubar_widget_value_tree (widget_value *wv)
 {
   if (! wv) return;
 
-  wv->name = wv->value = wv->key = (char *) 0xDEADBEEF;
+  wv->name = wv->value = wv->key = (char *) (intptr_t)0xDEADBEEF;
 
   if (wv->contents && (wv->contents != (widget_value*)1))
     {
       free_menubar_widget_value_tree (wv->contents);
-      wv->contents = (widget_value *) 0xDEADBEEF;
+      wv->contents = (widget_value *) (intptr_t)0xDEADBEEF;
     }
   if (wv->next)
     {
       free_menubar_widget_value_tree (wv->next);
-      wv->next = (widget_value *) 0xDEADBEEF;
+      wv->next = (widget_value *) (intptr_t)0xDEADBEEF;
     }
   block_input ();
   xfree (wv);

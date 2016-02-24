@@ -167,7 +167,7 @@ typedef BOOL (WINAPI * GetMonitorInfo_Proc)
   (IN HMONITOR monitor, OUT struct MONITOR_INFO* info);
 typedef HMONITOR (WINAPI * MonitorFromWindow_Proc)
   (IN HWND hwnd, IN DWORD dwFlags);
-typedef BOOL CALLBACK (* MonitorEnum_Proc)
+typedef BOOL (CALLBACK * MonitorEnum_Proc)
   (IN HMONITOR monitor, IN HDC hdc, IN RECT *rcMonitor, IN LPARAM dwData);
 typedef BOOL (WINAPI * EnumDisplayMonitors_Proc)
   (IN HDC hdc, IN RECT *rcClip, IN MonitorEnum_Proc fnEnum, IN LPARAM dwData);
@@ -7198,7 +7198,7 @@ DEFUN ("system-move-file-to-trash", Fsystem_move_file_to_trash,
 
       /* The Unicode version of SHFileOperation is not supported on
 	 Windows 9X. */
-      if (w32_unicode_filenames && os_subtype != OS_9X)
+      if (w32_unicode_filenames && os_subtype != OS_SUBTYPE_9X)
 	{
 	  SHFILEOPSTRUCTW file_op_w;
 	  /* We need one more element beyond MAX_PATH because this is
@@ -8103,7 +8103,7 @@ The coordinates X and Y are interpreted in pixels relative to a position
   /* When "mouse trails" are in effect, moving the mouse cursor
      sometimes leaves behind an annoying "ghost" of the pointer.
      Avoid that by momentarily switching off mouse trails.  */
-  if (os_subtype == OS_NT
+  if (os_subtype == OS_SUBTYPE_NT
       && w32_major_version + w32_minor_version >= 6)
     ret = SystemParametersInfo (SPI_GETMOUSETRAILS, 0, &trail_num, 0);
   SetCursorPos (XINT (x), XINT (y));
@@ -8380,7 +8380,7 @@ DEFUN ("default-printer-name", Fdefault_printer_name, Sdefault_printer_name,
   if (!OpenPrinter (pname_buf, &hPrn, NULL))
     return Qnil;
   /* GetPrinterW is not supported by unicows.dll.  */
-  if (w32_unicode_filenames && os_subtype != OS_9X)
+  if (w32_unicode_filenames && os_subtype != OS_SUBTYPE_9X)
     GetPrinterW (hPrn, 2, NULL, 0, &dwNeeded);
   else
     GetPrinterA (hPrn, 2, NULL, 0, &dwNeeded);
@@ -8390,7 +8390,7 @@ DEFUN ("default-printer-name", Fdefault_printer_name, Sdefault_printer_name,
       return Qnil;
     }
   /* Call GetPrinter again with big enough memory block.  */
-  if (w32_unicode_filenames && os_subtype != OS_9X)
+  if (w32_unicode_filenames && os_subtype != OS_SUBTYPE_9X)
     {
       /* Allocate memory for the PRINTER_INFO_2 struct.  */
       ppi2w = xmalloc (dwNeeded);
@@ -8524,9 +8524,9 @@ cache_system_info (void)
   w32_minor_version = version.info.minor;
 
   if (version.info.platform & 0x8000)
-    os_subtype = OS_9X;
+    os_subtype = OS_SUBTYPE_9X;
   else
-    os_subtype = OS_NT;
+    os_subtype = OS_SUBTYPE_NT;
 
   /* Cache page size, allocation unit, processor type, etc.  */
   GetSystemInfo (&sysinfo_cache);
@@ -8537,7 +8537,7 @@ cache_system_info (void)
   GetVersionEx (&osinfo_cache);
 
   w32_build_number = osinfo_cache.dwBuildNumber;
-  if (os_subtype == OS_9X)
+  if (os_subtype == OS_SUBTYPE_9X)
     w32_build_number &= 0xffff;
 
   w32_num_mouse_buttons = GetSystemMetrics (SM_CMOUSEBUTTONS);
@@ -8704,7 +8704,7 @@ w32_kbd_patch_key (KEY_EVENT_RECORD *event, int cpId)
 
   /* On NT, call ToUnicode instead and then convert to the current
      console input codepage.  */
-  if (os_subtype == OS_NT)
+  if (os_subtype == OS_SUBTYPE_NT)
     {
       WCHAR buf[128];
 
@@ -9144,7 +9144,7 @@ usage: (w32-notification-notify &rest PARAMS)  */)
   EMACS_INT retval;
   char *icon, *tip, *title, *msg;
   enum NI_Severity severity;
-  unsigned timeout;
+  unsigned timeout = 30 * 1000;
 
   if (nargs == 0)
     return Qnil;
@@ -9700,7 +9700,7 @@ stack_overflow_handler (void)
      too nested calls to mark_object.  No way to survive.  */
   if (gc_in_progress)
     terminate_due_to_signal (SIGSEGV, 40);
-#ifdef _WIN64
+#if defined(_WIN64) && !defined(_MSC_VER)
   /* See ms-w32.h: MinGW64's longjmp crashes if invoked in this context.  */
   __builtin_longjmp (return_to_command_loop, 1);
 #else
@@ -9929,7 +9929,7 @@ globals_of_w32fns (void)
 	      doc: /* The ANSI code page used by the system.  */);
   w32_ansi_code_page = GetACP ();
 
-  if (os_subtype == OS_NT)
+  if (os_subtype == OS_SUBTYPE_NT)
     w32_unicode_gui = 1;
   else
     w32_unicode_gui = 0;

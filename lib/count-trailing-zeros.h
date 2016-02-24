@@ -38,8 +38,12 @@ _GL_INLINE_HEADER_BEGIN
 # define COUNT_TRAILING_ZEROS(BUILTIN, MSC_BUILTIN, TYPE)               \
   return x ? BUILTIN (x) : CHAR_BIT * sizeof x;
 #elif _MSC_VER
+#if _MSC_VER >= 1900
+#include <intrin.h>
+#else
 # pragma intrinsic _BitScanForward
 # pragma intrinsic _BitScanForward64
+#endif
 # define COUNT_TRAILING_ZEROS(BUILTIN, MSC_BUILTIN, TYPE)               \
     do                                                                  \
       {                                                                 \

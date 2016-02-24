@@ -60,7 +60,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
    Similarly, msdos defines this as sys_chdir, but we're not linking with the
    file where that function is defined.  */
+#if !defined(_MSC_VER) && _MSC_VER < 1900
 #undef chdir
+#endif
 #define IS_SLASH(c)  ((c) == '/' || (c) == '\\' || (c) == ':')
 #else  /* not DOS_NT */
 #define IS_SLASH(c)  ((c) == '/')
@@ -788,20 +790,25 @@ static void
 scan_c_file (char *filename, const char *mode)
 {
   FILE *infile;
-  char extension = filename[strlen (filename) - 1];
+  char *extension = strrchr(filename, '.');
+  char *save_ext = NULL;
 
-  if (extension == 'o')
-    filename[strlen (filename) - 1] = 'c';
+  if (extension &&
+      (strcmp(extension, ".o") == 0 ||
+       strcmp(extension, ".obj") == 0)) {
+    save_ext = strcpy(alloca(strlen(extension) + 1), extension);
+    strcpy(extension, ".c");
+  }
 
   infile = fopen (filename, mode);
 
-  if (infile == NULL && extension == 'o')
+  if (infile == NULL && save_ext)
     {
       /* Try .m.  */
-      filename[strlen (filename) - 1] = 'm';
+      strcpy(extension, ".m");
       infile = fopen (filename, mode);
       if (infile == NULL)
-        filename[strlen (filename) - 1] = 'c'; /* Don't confuse people.  */
+	strcpy(extension, ".c"); /* Don't confuse people.  */
     }
 
   if (infile == NULL)
@@ -811,7 +818,7 @@ scan_c_file (char *filename, const char *mode)
     }
 
   /* Reset extension to be able to detect duplicate files.  */
-  filename[strlen (filename) - 1] = extension;
+  strcpy(extension, save_ext);
   scan_c_stream (infile);
 }
 

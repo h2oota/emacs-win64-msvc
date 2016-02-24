@@ -50,14 +50,12 @@ char *w32_getenv (char *);
 
 # include "syswait.h"
 
-# ifdef HAVE_INET_SOCKETS
 #  include <netinet/in.h>
 #  ifdef HAVE_SOCKETS
 #    include <sys/types.h>
 #    include <sys/socket.h>
 #    include <sys/un.h>
 #  endif /* HAVE_SOCKETS */
-# endif
 # include <arpa/inet.h>
 
 # define INVALID_SOCKET -1
@@ -81,6 +79,10 @@ char *w32_getenv (char *);
 #include <sys/stat.h>
 #include <signal.h>
 #include <errno.h>
+
+#ifndef _MSC_VER
+char *getenv (const char *);
+#endif
 
 #ifndef VERSION
 #define VERSION "unspecified"
@@ -661,7 +663,7 @@ fail (void)
 }
 
 
-#if !defined (HAVE_SOCKETS) || !defined (HAVE_INET_SOCKETS)
+#if !defined (HAVE_SOCKETS)
 
 int
 main (int argc, char **argv)
@@ -674,7 +676,7 @@ main (int argc, char **argv)
   fail ();
 }
 
-#else /* HAVE_SOCKETS && HAVE_INET_SOCKETS */
+#else /* HAVE_SOCKETS */
 
 #define AUTH_KEY_LENGTH      64
 #define SEND_BUFFER_SIZE   4096

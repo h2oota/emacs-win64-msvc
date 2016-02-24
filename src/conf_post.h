@@ -251,7 +251,11 @@ extern int emacs_setenv_TZ (char const *);
 #endif
 
 #define ATTRIBUTE_CONST _GL_ATTRIBUTE_CONST
+#if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
 #define ATTRIBUTE_UNUSED _GL_UNUSED
+#else
+#define ATTRIBUTE_UNUSED
+#endif
 
 #if 3 <= __GNUC__
 # define ATTRIBUTE_MALLOC __attribute__ ((__malloc__))
