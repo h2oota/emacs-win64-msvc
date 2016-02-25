@@ -3285,6 +3285,8 @@ deliver_wm_chars (int do_translate, HWND hwnd, UINT msg, UINT wParam,
 /***********************************************************************
 			  Input Method Editor
 ***********************************************************************/
+/* unicode kana => roman reverse conversion */
+/* half width kana FF61-FF9F */
 static const char kana_roman_101[0xffa0 - 0xff61] = {
   [0xFF61 - 0xFF61] = '.', // IDEOGRAPHIC FULL STOP
   [0xFF62 - 0xFF61] = '[', // LEFT CORNER BRACKET
@@ -3320,8 +3322,8 @@ static const char kana_roman_106[0xffa0 - 0xff61] = {
   [0xFF99 - 0xFF61] = '.', // KATAKANA LETTER RU
   [0xFF92 - 0xFF61] = '/', // KATAKANA LETTER ME
   [0xFF9B - 0xFF61] = '\\',// KATAKANA LETTER RO
-
 };
+static char kana_roman_generic[0xffa0 - 0xff61];
 static const char *kana_roman_translation_table = kana_roman_101;
 
 static int
@@ -3737,6 +3739,41 @@ DEFUN ("ime-get-open-status", Fime_get_open_status,
     SendMessage (hwnd, WM_MULE_IMM_GET_OPEN_STATUS, 0, 0)
     ? Qt : Qnil;
 }
+DEFUN ("ime-set-kana-roman-translation-table",
+       Fime_set_kana_roman_translation_table,
+       Sime_set_kana_roman_translation_table, 1, 1, 0,
+       doc: /* set Ime kana roman translation TABLE.
+TABLE should be 101, 106 or vector  */)
+  (Lisp_Object table)
+{
+  if (INTEGERP (table))
+    switch(XINT(table)) {
+    case 101:
+      kana_roman_translation_table = kana_roman_101;
+      break;
+    case 104:
+      kana_roman_translation_table = kana_roman_106;
+      break;
+    default:
+      error ("Unknown keyboard: %d", XINT(table));
+      break;
+    }
+  else {
+    CHECK_VECTOR (table);
+
+    for (int i = 0; i < countof(kana_roman_generic); i++)
+      kana_roman_generic[i] = 0;
+    for (int i = 0, len = ASIZE (table);
+	 i < countof(kana_roman_generic) && i < len; i++) {
+      Lisp_Object v = AREF (table, i);
+      CHECK_NUMBER (v);
+      kana_roman_generic[i] = XFASTINT(v);
+    }
+    kana_roman_translation_table = kana_roman_generic;
+  }
+  return Qnil;
+}
+
 extern int read_key_sequence_level;
 #endif /* USE_W32_IME */
 
