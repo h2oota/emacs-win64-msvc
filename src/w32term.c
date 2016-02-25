@@ -550,7 +550,7 @@ x_update_window_begin (struct window *w)
   /* Hide the system caret during an update.  */
   if (w32_use_visible_system_caret && w32_system_caret_hwnd)
     {
-      SendMessage (w32_system_caret_hwnd, WM_EMACS_HIDE_CARET, 0, 0);
+      w32_send_message (w32_system_caret_hwnd, WM_EMACS_HIDE_CARET, 0, 0);
     }
 
   w->output_cursor = w->cursor;
@@ -714,7 +714,7 @@ x_update_window_end (struct window *w, bool cursor_on_p,
      x_update_window_begin.  */
   if (w32_use_visible_system_caret && w32_system_caret_hwnd)
     {
-      SendMessage (w32_system_caret_hwnd, WM_EMACS_SHOW_CARET, 0, 0);
+      w32_send_message (w32_system_caret_hwnd, WM_EMACS_SHOW_CARET, 0, 0);
     }
 }
 
@@ -3633,7 +3633,7 @@ w32_set_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
 static HWND
 my_create_vscrollbar (struct frame * f, struct scroll_bar * bar)
 {
-  return (HWND) SendMessage (FRAME_W32_WINDOW (f),
+  return (HWND) w32_send_message (FRAME_W32_WINDOW (f),
 			     WM_EMACS_CREATEVSCROLLBAR, (WPARAM) f,
 			     (LPARAM) bar);
 }
@@ -3641,7 +3641,7 @@ my_create_vscrollbar (struct frame * f, struct scroll_bar * bar)
 static HWND
 my_create_hscrollbar (struct frame * f, struct scroll_bar * bar)
 {
-  return (HWND) SendMessage (FRAME_W32_WINDOW (f),
+  return (HWND) w32_send_message (FRAME_W32_WINDOW (f),
 			     WM_EMACS_CREATEHSCROLLBAR, (WPARAM) f,
 			     (LPARAM) bar);
 }
@@ -3652,7 +3652,7 @@ static BOOL
 my_show_window (struct frame *f, HWND hwnd, int how)
 {
 #ifndef ATTACH_THREADS
-  return SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_SHOWWINDOW,
+  return w32_send_message (FRAME_W32_WINDOW (f), WM_EMACS_SHOWWINDOW,
 		      (WPARAM) hwnd, (LPARAM) how);
 #else
   return ShowWindow (hwnd, how);
@@ -3671,7 +3671,7 @@ my_set_window_pos (HWND hwnd, HWND hwndAfter,
   pos.cx = cx;
   pos.cy = cy;
   pos.flags = flags;
-  SendMessage (hwnd, WM_EMACS_SETWINDOWPOS, (WPARAM) &pos, 0);
+  w32_send_message (hwnd, WM_EMACS_SETWINDOWPOS, (WPARAM) &pos, 0);
 #else
   SetWindowPos (hwnd, hwndAfter, x, y, cx, cy, flags);
 #endif
@@ -3681,7 +3681,7 @@ my_set_window_pos (HWND hwnd, HWND hwndAfter,
 static void
 my_set_focus (struct frame * f, HWND hwnd)
 {
-  SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_SETFOCUS,
+  w32_send_message (FRAME_W32_WINDOW (f), WM_EMACS_SETFOCUS,
 	       (WPARAM) hwnd, 0);
 }
 #endif
@@ -3689,21 +3689,21 @@ my_set_focus (struct frame * f, HWND hwnd)
 static void
 my_set_foreground_window (HWND hwnd)
 {
-  SendMessage (hwnd, WM_EMACS_SETFOREGROUND, (WPARAM) hwnd, 0);
+  w32_send_message (hwnd, WM_EMACS_SETFOREGROUND, (WPARAM) hwnd, 0);
 }
 
 
 static void
 my_destroy_window (struct frame * f, HWND hwnd)
 {
-  SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_DESTROYWINDOW,
+  w32_send_message (FRAME_W32_WINDOW (f), WM_EMACS_DESTROYWINDOW,
 	       (WPARAM) hwnd, 0);
 }
 
 static void
 my_bring_window_to_top (HWND hwnd)
 {
-  SendMessage (hwnd, WM_EMACS_BRINGTOTOP, (WPARAM) hwnd, 0);
+  w32_send_message (hwnd, WM_EMACS_BRINGTOTOP, (WPARAM) hwnd, 0);
 }
 
 /* Create a scroll bar and return the scroll bar vector for it.  W is
@@ -5301,6 +5301,22 @@ w32_read_socket (struct terminal *terminal,
 	    queue_notifications (&inev, &msg, f, &count);
 	  break;
 #endif
+#ifdef USE_W32_IME
+	case WM_IME_NOTIFY:
+	  if (msg.msg.wParam == IMN_SETOPENSTATUS) {
+	    if (!NILP(Vw32_ime_set_open_status_functions))
+	      Frun_hook_with_args
+		(2, (Lisp_Object[]){
+		  intern("w32-ime-set-open-status-functions"),
+		    msg.msg.lParam ? Qt : Qnil});
+	  }
+	  break;
+#if defined(USE_IME_RECONVERTSTRING) || defined(USE_IME_DOCUMENTFEED)
+	case WM_MULE_IMM_REQURST_STRING:
+	  w32_request_string((struct ime_requrst_string *)msg.msg.lParam);
+	  break;
+#endif
+#endif
 
 	default:
 	  /* Check for messages registered at runtime.  */
@@ -6507,7 +6523,7 @@ x_iconify_frame (struct frame *f)
   x_set_bitmap_icon (f);
 
   /* Simulate the user minimizing the frame.  */
-  SendMessage (FRAME_W32_WINDOW (f), WM_SYSCOMMAND, SC_MINIMIZE, 0);
+  w32_send_message (FRAME_W32_WINDOW (f), WM_SYSCOMMAND, SC_MINIMIZE, 0);
 
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, true);
@@ -7074,6 +7090,13 @@ syms_of_w32term (void)
 	      w32_num_mouse_buttons,
 	      doc: /* Number of physical mouse buttons.  */);
   w32_num_mouse_buttons = 2;
+
+#ifdef USE_W32_IME
+  DEFVAR_LISP ("w32-ime-set-open-status-functions",
+	       Vw32_ime_set_open_status_functions,
+	       doc: /* List of functions called with IME-open-status when IME open status changed*/);
+  Vw32_ime_set_open_status_functions = Qnil;
+#endif
 
   DEFVAR_LISP ("w32-swap-mouse-buttons",
 	      Vw32_swap_mouse_buttons,

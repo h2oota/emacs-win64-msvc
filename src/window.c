@@ -477,6 +477,9 @@ select_window (Lisp_Object window, Lisp_Object norecord,
 {
   struct window *w;
   struct frame *sf;
+#ifdef USE_W32_IME
+  Lisp_Object oldwin = selected_window;
+#endif /* USE_W32_IME */
 
   CHECK_LIVE_WINDOW (window);
 
@@ -529,6 +532,10 @@ select_window (Lisp_Object window, Lisp_Object norecord,
       record_buffer (w->contents);
     }
 
+#ifdef USE_W32_IME
+  if (!NILP (Vselect_window_functions))
+    run_hook_with_args_2 (intern("select-window-functions"), oldwin, window);
+#endif /* USE_W32_IME */
   return window;
 }
 
@@ -3373,6 +3380,15 @@ This function runs `window-scroll-functions' before running
       unshow_buffer (w);
     }
 
+#ifdef USE_W32_IME
+  if (!NILP (Vset_selected_window_buffer_functions)) {
+    Lisp_Object temp[] = {
+      intern("set-selected-window-buffer-functions"),
+      tem, window, buffer
+    };
+    Frun_hook_with_args (sizeof(temp)/sizeof(temp[0]), temp);
+  }
+#endif /* USE_W32_IME */
   set_window_buffer (window, buffer, true, !NILP (keep_margins));
 
   return Qnil;
@@ -7189,6 +7205,17 @@ syms_of_window (void)
   window_scroll_pixel_based_preserve_y = -1;
   window_scroll_preserve_hpos = -1;
   window_scroll_preserve_vpos = -1;
+
+#ifdef USE_W32_IME
+  DEFVAR_LISP("set-selected-window-buffer-functions",
+	      Vset_selected_window_buffer_functions,
+	      doc: /* List of functions to be called at the end of `set-window-buffer' */);
+  Vset_selected_window_buffer_functions = Qnil;
+  DEFVAR_LISP("select-window-functions", Vselect_window_functions,
+	      doc: /* List of functions to be called when the buffer which is displayed in window has benn changed.
+set-frame-selected-window, select-window, set-window-configuration ... */);
+  Vselect_window_functions = Qnil;
+#endif
 
   DEFVAR_LISP ("temp-buffer-show-function", Vtemp_buffer_show_function,
 	       doc: /* Non-nil means call as function to display a help buffer.

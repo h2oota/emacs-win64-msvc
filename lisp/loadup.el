@@ -264,6 +264,8 @@
       (load "term/w32-win")
       (load "disp-table")
       (when (eq system-type 'windows-nt)
+        (when (fboundp 'ime-get-open-status)
+          (load "international/windows-ime-util"))
         (load "w32-fns")
         (load "ls-lisp")
         (load "dos-w32"))))

@@ -665,6 +665,22 @@ do { \
 #define WM_EMACS_FILENOTIFY            (WM_EMACS_START + 25)
 #define WM_EMACS_END                   (WM_EMACS_START + 26)
 
+#ifdef USE_W32_IME
+/* For internal communications
+   from main thread to window procedure. */
+#define WM_MULE_IMM_MESSAGE_START             (WM_USER+2300)
+#define WM_MULE_IMM_SET_OPEN_STATUS           (WM_USER+2300)
+#define WM_MULE_IMM_GET_OPEN_STATUS           (WM_USER+2301)
+#define WM_MULE_IMM_SET_CONVERSION_STATUS     (WM_USER+2302)
+#define WM_MULE_IMM_GET_CONVERSION_STATUS     (WM_USER+2303)
+#define WM_MULE_IMM_NOTYFI_OPEN_STATUS        (WM_USER+2303)
+#define WM_MULE_IMM_NOTYFI_CONVERSION_STATUS  (WM_USER+2303)
+#if defined(USE_IME_RECONVERTSTRING) || defined(USE_IME_DOCUMENTFEEDSTRING)
+#define WM_MULE_IMM_REQURST_STRING            (WM_USER+2304)
+#endif
+#define WM_MULE_IMM_MESSAGE_END               (WM_USER+2399)
+#endif
+
 #define WND_FONTWIDTH_INDEX    (0)
 #define WND_LINEHEIGHT_INDEX   (4)
 #define WND_BORDER_INDEX       (8)
@@ -846,6 +862,11 @@ typedef char guichar_t;
 
 extern Lisp_Object w32_popup_dialog (struct frame *, Lisp_Object, Lisp_Object);
 extern void w32_arrow_cursor (void);
+
+#if defined (USE_IME_RECONVERTSTRING) || defined (USE_IME_DOCUMENTFEEDSTRING)
+void w32_request_string(struct ime_requrst_string *req);
+#endif
+LRESULT w32_send_message(HWND, UINT, WPARAM, LPARAM);
 
 extern void syms_of_w32term (void);
 extern void syms_of_w32menu (void);

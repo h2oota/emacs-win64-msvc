@@ -345,6 +345,9 @@ AC_ARG_WITH([ns],[AS_HELP_STRING([--with-ns],
 [use Nextstep (OS X Cocoa or GNUstep) windowing system.
 On by default on Mac OS X.])],[],[with_ns=maybe])
 OPTION_DEFAULT_OFF([w32], [use native MS Windows GUI in a Cygwin build])
+OPTION_DEFAULT_ON([w32-ime], [don't compile with W32-IME support])
+OPTION_DEFAULT_ON([reconversion], [don't compile with RECONVERSION support])
+OPTION_DEFAULT_ON([documentfeed], [don't compile with DOCUMENTFEED support])
 
 OPTION_DEFAULT_ON([gpm],[don't use -lgpm for mouse support on a GNU/Linux console])
 OPTION_DEFAULT_ON([dbus],[don't compile with D-Bus support])
@@ -5269,6 +5272,24 @@ else
   ACL_SUMMARY=no
 fi
 
+USE_W32_IME=no
+if test "${HAVE_W32}" = "yes"; then
+  if test "${with_w32_ime}" != "no"; then
+    USE_W32_IME=yes
+    AC_DEFINE(USE_W32_IME, 1, [Define to support W32-IME.])
+    USE_RECONVERTSTRING=no
+    if test "${with_reconversion}" != "no"; then
+        AC_DEFINE(USE_IME_RECONVERTSTRING, 1, [Define 1 to support RECONVERTSTRING.])
+        USE_RECONVERTSTRING=yes
+    fi
+    USE_DOCUMENTFEED=no
+    if test "${with_reconversion}" != "no"; then
+        AC_DEFINE(USE_IME_DOCUMENTFEED, 1, [Define 1 if to support DOCUMENTFEED.])
+        USE_DOCUMENTFEED=yes
+    fi
+  fi
+fi
+
 emacs_standard_dirs='Standard dirs'
 AS_ECHO(["
 Configured for '${canonical}'.
@@ -5339,6 +5360,9 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs have dynamic modules support?                ${HAVE_MODULES}
   Does Emacs use toolkit scroll bars?                     ${USE_TOOLKIT_SCROLL_BARS}
   Does Emacs support Xwidgets (requires gtk3)?            ${HAVE_XWIDGETS}
+  Does Emacs support W32-IME?                             ${USE_W32_IME}
+  Does Emacs support RECONVERSION?                        ${USE_RECONVERSION}
+  Does Emacs support DOCUMENTFEED?                        ${USE_DOCUMENTFEED}
 "])
 
 if test -n "${EMACSDATA}"; then

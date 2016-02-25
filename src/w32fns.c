@@ -154,6 +154,18 @@ struct MONITOR_INFO_EX
 DECLARE_HANDLE(HMONITOR);
 #endif
 
+#if defined (USE_IME_RECONVERTSTRING)
+#define RECONV_LENG 128
+#define RECONVERTSTRING_REQ_LENG \
+  (sizeof(RECONVERTSTRING) + (RECONV_LENG * 2 + 1) * sizeof(wchar_t))
+#endif
+#if defined (USE_IME_DOCUMENTFEED)
+#define DOCFEED_LENG 128
+#define DOCUMENTFEED_REQ_LENG \
+  (sizeof (RECONVERTSTRING) + (DOCFEED_LENG * 2 + DOCFEED_CSTR_LENG + 1) * sizeof(wchar_t))
+#define DOCFEED_CSTR_LENG 64
+#endif
+
 typedef BOOL (WINAPI * TrackMouseEvent_Proc)
   (IN OUT LPTRACKMOUSEEVENT lpEventTrack);
 typedef LONG (WINAPI * ImmGetCompositionString_Proc)
@@ -162,6 +174,20 @@ typedef HIMC (WINAPI * ImmGetContext_Proc) (IN HWND window);
 typedef BOOL (WINAPI * ImmReleaseContext_Proc) (IN HWND wnd, IN HIMC context);
 typedef BOOL (WINAPI * ImmSetCompositionWindow_Proc) (IN HIMC context,
 						      IN COMPOSITIONFORM *form);
+#ifdef USE_W32_IME
+typedef BOOL (WINAPI * ImmNotifyIME_Proc) (IN HIMC hIMC, IN DWORD dwAction,
+					IN DWORD dwIndex,  IN DWORD dwValue);
+typedef BOOL (WINAPI * ImmGetConversionStatus_Proc)
+  (IN HIMC, OUT LPDWORD, OUT LPDWORD);
+typedef BOOL (WINAPI * ImmSetConversionStatus_Proc)
+  (IN HIMC, IN DWORD, IN DWORD);
+typedef BOOL (WINAPI * ImmGetOpenStatus_Proc)(IN HIMC);
+typedef BOOL (WINAPI * ImmSetOpenStatus_Proc)(IN HIMC, IN BOOL);
+#ifdef USE_IME_DOCUMENTFEED
+ typedef LONG (WINAPI * ImmGetCompositionString_Proc)
+   (IN HIMC context, IN DWORD index, OUT LPVOID buffer, IN DWORD bufLen);
+#endif
+#endif /* USE_W32_IME */
 typedef HMONITOR (WINAPI * MonitorFromPoint_Proc) (IN POINT pt, IN DWORD flags);
 typedef BOOL (WINAPI * GetMonitorInfo_Proc)
   (IN HMONITOR monitor, OUT struct MONITOR_INFO* info);
@@ -179,6 +205,13 @@ ImmGetCompositionString_Proc get_composition_string_fn = NULL;
 ImmGetContext_Proc get_ime_context_fn = NULL;
 ImmReleaseContext_Proc release_ime_context_fn = NULL;
 ImmSetCompositionWindow_Proc set_ime_composition_window_fn = NULL;
+#ifdef USE_W32_IME
+ImmGetConversionStatus_Proc get_ime_conversion_status_fn = NULL;
+ImmSetConversionStatus_Proc set_ime_conversion_status_fn = NULL;
+ImmGetOpenStatus_Proc get_ime_open_status_fn = NULL;
+ImmSetOpenStatus_Proc set_ime_open_status_fn = NULL;
+ImmNotifyIME_Proc notify_ime_fn = NULL;
+#endif /* USE_W32_IME */
 MonitorFromPoint_Proc monitor_from_point_fn = NULL;
 GetMonitorInfo_Proc get_monitor_info_fn = NULL;
 MonitorFromWindow_Proc monitor_from_window_fn = NULL;
@@ -190,6 +223,22 @@ GetTitleBarInfo_Proc get_title_bar_info_fn = NULL;
 #else /* !NTGUI_UNICODE */
 extern AppendMenuW_Proc unicode_append_menu;
 #endif /* NTGUI_UNICODE */
+
+#ifdef USE_W32_IME
+static CRITICAL_SECTION w32_ime_ipc_critical_section;
+LRESULT w32_send_message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+  EnterCriticalSection(&w32_ime_ipc_critical_section);
+  LRESULT r = SendMessage(hwnd, msg, wparam, lparam);
+  LeaveCriticalSection (&w32_ime_ipc_critical_section);
+  return r;
+}
+#else
+LRESULT w32_send_message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+  return SendMessage(hwnd, msg, wparam, lparam);
+}
+#endif
 
 /* Flag to selectively ignore WM_IME_CHAR messages.  */
 static int ignore_ime_char = 0;
@@ -3248,6 +3297,534 @@ deliver_wm_chars (int do_translate, HWND hwnd, UINT msg, UINT wParam,
   return 0;
 }
 
+#ifdef USE_W32_IME
+/***********************************************************************
+			  Input Method Editor
+***********************************************************************/
+static const char kana_roman_101[0xffa0 - 0xff61] = {
+  [0xFF61 - 0xFF61] = '.', // IDEOGRAPHIC FULL STOP
+  [0xFF62 - 0xFF61] = '[', // LEFT CORNER BRACKET
+  [0xFF63 - 0xFF61] = ']', // RIGHT CORNER BRACKET
+  [0xFF64 - 0xFF61] = ',', // IDEOGRAPHIC COMMA
+  [0xFF65 - 0xFF61] = '/', // KATAKANA MIDDLE DOT
+  [0xFF70 - 0xFF61] = '-', // KATAKANA-HIRAGANA PROLONGED SOUND MARK
+  [0xFF71 - 0xFF61] = 'a', // KATAKANA LETTER A
+  [0xFF72 - 0xFF61] = 'i', // KATAKANA LETTER I
+  [0xFF73 - 0xFF61] = 'u', // KATAKANA LETTER U
+  [0xFF74 - 0xFF61] = 'e', // KATAKANA LETTER E
+  [0xFF75 - 0xFF61] = 'o', // KATAKANA LETTER O
+};
+
+static const char kana_roman_106[0xffa0 - 0xff61] = {
+  [0xFF71 - 0xFF61] = 'a', // KATAKANA LETTER A
+  [0xFF72 - 0xFF61] = 'i', // KATAKANA LETTER I
+  [0xFF73 - 0xFF61] = 'u', // KATAKANA LETTER U
+  [0xFF74 - 0xFF61] = 'e', // KATAKANA LETTER E
+  [0xFF75 - 0xFF61] = 'o', // KATAKANA LETTER O
+
+  [0xFF8E - 0xFF61] = '-', // KATAKANA LETTER HO
+  [0xFF8D - 0xFF61] = '^', // KATAKANA LETTER HE
+
+  [0xFF9E - 0xFF61] = '@', // KATAKANA VOICED SOUND MARK
+  [0xFF9F - 0xFF61] = '[', // KATAKANA SEMI-VOICED SOUND MARK
+
+  [0xFF9A - 0xFF61] = ';', // KATAKANA LETTER ER
+  [0xFF79 - 0xFF61] = ':', // KATAKANA LETTER KE
+  [0xFF91 - 0xFF61] = ']', // KATAKANA LETTER MU
+
+  [0xFF88 - 0xFF61] = ',', // KATAKANA LETTER NE
+  [0xFF99 - 0xFF61] = '.', // KATAKANA LETTER RU
+  [0xFF92 - 0xFF61] = '/', // KATAKANA LETTER ME
+  [0xFF9B - 0xFF61] = '\\',// KATAKANA LETTER RO
+
+};
+static const char *kana_roman_translation_table = kana_roman_101;
+
+static int
+w32_get_ime_open_status (HWND hwnd)
+{
+  HIMC context = (*get_ime_context_fn) (hwnd);
+  int ret = (*get_ime_open_status_fn) (context);
+  (*release_ime_context_fn) (hwnd, context);
+  return ret;
+}
+
+static int
+w32_set_ime_open_status (HWND hwnd, int openp)
+{
+  HIMC context = (*get_ime_context_fn) (hwnd);
+  if (openp != 0 && openp != 1)
+    openp = !(*get_ime_open_status_fn) (context);
+
+  int ret = (*set_ime_open_status_fn) (context, openp);
+  (*release_ime_context_fn) (hwnd, context);
+  return ret;
+}
+
+static int
+w32_get_ime_conversion_status (HWND hwnd, LPDWORD cmode, LPDWORD smode)
+{
+  HIMC context = (*get_ime_context_fn) (hwnd);
+  int ret = (*get_ime_conversion_status_fn) (context, cmode, smode);
+  (*release_ime_context_fn) (hwnd, context);
+  return ret;
+}
+
+static int
+w32_set_ime_conversion_status (HWND hwnd, DWORD cmode, DWORD smode)
+{
+  HIMC context = (*get_ime_context_fn) (hwnd);
+  int ret = (*set_ime_conversion_status_fn) (context, cmode, smode);
+  (*release_ime_context_fn) (hwnd, context);
+  return ret;
+}
+
+
+/*
+ * RECONVERTSTRING, DOCUMENTFEED
+ */
+#ifdef USE_IME_RECONVERTSTRING
+
+static EMACS_INT compstr_beginning_pos(int max_char)
+{
+  EMACS_INT bol, point = PT, pt;
+  for (bol = XFASTINT(Fline_beginning_position(Qnil)), pt = PT;
+       PT >= bol && PT > point - max_char; ) {
+    pt = PT;
+    if (NILP(Fforward_word (make_number (-1))))
+      break;
+  }
+  Fgoto_char (make_number(point));
+  return pt;
+}
+
+static EMACS_INT compstr_end_pos(int max_char)
+{
+  EMACS_INT eol, point = PT, pt;
+
+  for (eol = XFASTINT(Fline_end_position(Qnil)), pt = PT;
+       PT <= eol && PT < point + max_char;) {
+    pt = PT;
+    if (NILP(Fforward_word (make_number (1))))
+      break;
+  }
+  Fgoto_char (make_number(point));
+  return pt;
+}
+
+/* main thread */
+static LRESULT
+get_request_string (RECONVERTSTRING *reconv,
+		    wchar_t *compstr)
+{
+  EMACS_INT pt, pt_byte, start, end, len, t_start, t_end, compstr_len;
+
+  if (!NILP (BVAR (current_buffer, read_only)))
+    return 0;
+
+  pt = PT;
+  pt_byte = PT_BYTE;
+
+  if (compstr)
+    {
+      t_start = PT;
+      start = compstr_beginning_pos (DOCFEED_LENG);
+      end = compstr_end_pos (DOCFEED_LENG);
+    }
+  else if (!NILP (BVAR (current_buffer, mark_active))
+    && !NILP (Vtransient_mark_mode))
+    {
+      if (marker_position (BVAR (current_buffer, mark)) < PT)
+	{
+	  t_start = marker_position (BVAR (current_buffer, mark));
+	  t_end = PT;
+	}
+      else
+	{
+	  t_start = PT;
+	  t_end = marker_position (BVAR (current_buffer, mark));
+	}
+      Fgoto_char (make_number (t_end));
+      while (!NILP (Fbolp ()) && t_start < PT)
+	Fforward_char (make_number (-1));
+      if (t_start >= PT)
+	return 0;
+      t_end = PT;
+    }
+  else
+    {
+      if (NILP (Feobp ()))
+	Fforward_char (make_number (1));
+      if (!NILP (Fforward_word (make_number (-1))))
+	t_start = PT;
+      else
+	{
+	  SET_PT_BOTH (pt, pt_byte);
+	  return 0;
+	}
+      Fforward_word (make_number (1));
+      t_end = PT;
+      SET_PT_BOTH (pt, pt_byte);
+      if (t_end < PT)
+	return 0;
+    }
+
+  if (!compstr)
+    {
+      if (t_start == t_end)
+	return 0;
+
+      Fgoto_char (make_number (t_start));
+      start = compstr_beginning_pos (RECONV_LENG);
+      Fgoto_char (make_number (t_end));
+      end = compstr_end_pos (RECONV_LENG);
+    }
+
+  len = end - start;
+  if (reconv)
+    {
+      int pos;
+      WCHAR *s;
+
+      s = (WCHAR *) (reconv + 1);
+
+      for (pos = start; pos < t_start; pos++)
+	*s++ = (WCHAR) FETCH_CHAR (CHAR_TO_BYTE (pos));
+
+      if (compstr)
+	{
+	  for (compstr_len = 0; compstr[compstr_len]; compstr_len++)
+	    *s++ = compstr[compstr_len];
+
+	  len += compstr_len;
+	}
+      else
+	compstr_len = t_end - t_start;
+
+      for (; pos < end; pos++)
+	*s++ = (WCHAR) FETCH_CHAR (CHAR_TO_BYTE (pos));
+
+      *s = 0;
+    }
+  else
+    {
+      emacs_abort();
+      SET_PT_BOTH (pt, pt_byte);
+      if (compstr)
+	{
+	  for (compstr_len = 0; compstr[compstr_len]; compstr_len++)
+	    ;
+
+	  len += compstr_len;
+	}
+      return (sizeof (RECONVERTSTRING) + (len + 1) * sizeof(wchar_t));
+    }
+
+  reconv->dwStrOffset = sizeof (RECONVERTSTRING);
+  reconv->dwStrLen = len;
+  reconv->dwCompStrOffset =
+    reconv->dwTargetStrOffset = (t_start - start) * sizeof(wchar_t);
+  reconv->dwCompStrLen =
+    reconv->dwTargetStrLen = compstr_len;
+
+  if (!compstr) {
+    del_range (t_start, t_end);
+    Fgoto_char (make_number (t_start));
+    redisplay ();
+  }
+  reconv->dwSize = sizeof (RECONVERTSTRING) + (len + 1) * sizeof(wchar_t);
+  return reconv->dwSize;
+}
+
+struct ime_requrst_string {
+  RECONVERTSTRING *reconv;
+  wchar_t  *compstr;
+  LRESULT  lresult;
+  HANDLE   s;
+};
+/* called from main thread */
+void w32_request_string(struct ime_requrst_string *req)
+{
+  req->lresult = get_request_string(req->reconv, req->compstr);
+  // signal to GUI thread
+  ReleaseSemaphore(req->s, 1, NULL);
+}
+
+/* called from w32 gui thread */
+static LRESULT
+ime_request_string (HWND hwnd,
+		    WPARAM wParam, LPARAM lParam)
+{
+  struct ime_requrst_string request = {
+    .lresult = 0,
+    .reconv = (RECONVERTSTRING *)lParam,
+    .s = CreateSemaphore(NULL, 0, 1, NULL),
+  };
+  if (request.s == INVALID_HANDLE_VALUE)
+    return 0;
+
+#ifdef USE_IME_DOCUMENTFEED
+  if (wParam == IMR_DOCUMENTFEED) {
+    HIMC context  = (*get_ime_context_fn)(hwnd);
+    if (!context)
+      goto done;
+
+    if ((get_composition_string_fn) (context, GCS_COMPSTR, NULL, 0)
+	>= DOCFEED_CSTR_LENG * sizeof(wchar_t))	{
+      (*release_ime_context_fn) (hwnd, context);
+      goto done;
+    }
+
+    request.compstr = alloca(DOCFEED_CSTR_LENG * sizeof(wchar_t));
+
+    LONG l;
+    switch (l = (*get_composition_string_fn)
+	    (context, GCS_COMPSTR, request.compstr,
+	     (DOCFEED_CSTR_LENG - 1) * sizeof(wchar_t))) {
+
+    case IMM_ERROR_NODATA:
+    case IMM_ERROR_GENERAL:
+      request.compstr[0] = 0;
+      break;
+    default:
+      request.compstr[l / sizeof(wchar_t)] = 0;
+      break;
+    }
+    (*release_ime_context_fn) (hwnd, context);
+  }
+#endif
+
+  W32Msg msg = {0};
+  // request to main thread */
+  my_post_msg(&msg, NULL, WM_MULE_IMM_REQURST_STRING, 0, (LPARAM)&request);
+  // wait
+  if (WaitForSingleObject(request.s, INFINITE) != WAIT_OBJECT_0)
+    emacs_abort ();
+
+ done:
+  CloseHandle(request.s);
+  return request.lresult;
+}
+#endif
+
+/*
+  Emacs Lisp function entries
+*/
+#define countof(a) (sizeof(a) / sizeof(a[0]))
+#if 0
+static Lisp_Object
+  Qime_cmode_alphanumeric,
+  Qime_cmode_charcode,
+  Qime_cmode_eudc,
+  Qime_cmode_fixed,
+  Qime_cmode_fullshape,
+  Qime_cmode_hanjaconvert,
+  Qime_cmode_katakana,
+  Qime_cmode_native,
+  Qime_cmode_noconversion,
+  Qime_cmode_roman,
+  Qime_cmode_softkbd,
+  Qime_cmode_symbol,
+  Qime_smode_automatic,
+  Qime_smode_none,
+  Qime_smode_phrasepredict,
+  Qime_smode_plauralclause,
+  Qime_smode_singleconvert,
+  Qime_smode_conversation;
+#endif
+
+#ifndef countof
+#define countof(a) (sizeof (a) / sizeof (a[0]))
+#endif
+
+#define CMODES(m)					\
+    m(IME_CMODE_ALPHANUMERIC, Qime_cmode_alphanumeric),	\
+    m(IME_CMODE_CHARCODE, Qime_cmode_charcode),		\
+    m(IME_CMODE_EUDC, Qime_cmode_eudc),			\
+    m(IME_CMODE_FIXED, Qime_cmode_fixed),		\
+    m(IME_CMODE_FULLSHAPE, Qime_cmode_fullshape),	\
+    m(IME_CMODE_HANJACONVERT, Qime_cmode_hanjaconvert),	\
+    m(IME_CMODE_KATAKANA, Qime_cmode_katakana),		\
+    m(IME_CMODE_NATIVE, Qime_cmode_native),		\
+    m(IME_CMODE_NOCONVERSION, Qime_cmode_noconversion),	\
+    m(IME_CMODE_ROMAN, Qime_cmode_roman),		\
+    m(IME_CMODE_SOFTKBD, Qime_cmode_softkbd),		\
+    m(IME_CMODE_SYMBOL, Qime_cmode_symbol),
+
+#define SMODES(m)						\
+    m(IME_SMODE_AUTOMATIC, Qime_smode_automatic),		\
+    m(IME_SMODE_NONE, Qime_smode_none),				\
+    m(IME_SMODE_PHRASEPREDICT, Qime_smode_phrasepredict),	\
+    m(IME_SMODE_PLAURALCLAUSE, Qime_smode_plauralclause),	\
+    m(IME_SMODE_SINGLECONVERT, Qime_smode_singleconvert),	\
+    m(IME_SMODE_CONVERSATION, Qime_smode_conversation),
+
+#define alloc_array(e, s) {e}
+static struct ime_mode{
+  DWORD mode; Lisp_Object name;
+} conversion_modes[] ={
+  CMODES(alloc_array)
+}, sentense_modes[] = {
+  SMODES(alloc_array)
+};
+
+DEFUN ("ime-get-conversion-status", Fime_get_conversion_status,
+       Sime_get_conversion_status, 0, 1, "",
+       doc: /* Get IME status.
+t means status of IME is open.  nil means it is close.  */)
+  (Lisp_Object frame)
+{
+  struct frame *f;
+  if (NILP (frame))
+    {
+      f = SELECTED_FRAME ();
+    }
+  else
+    {
+      CHECK_FRAME (frame);
+      f = XFRAME (frame);
+    }
+  HWND hwnd = FRAME_W32_WINDOW (f);
+  DWORD result[2];
+
+  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
+    LRESULT r = SendMessage
+      (hwnd, WM_MULE_IMM_GET_CONVERSION_STATUS, 0, (DWORD_PTR) result);
+    LeaveCriticalSection (&w32_ime_ipc_critical_section);
+    if (r == 0)
+      return Qnil;
+  } else
+    return Qnil;
+
+  Lisp_Object modes[2] = {
+    Qnil, Qnil
+  };
+  //cmode = Qnil, smode = Qnil;
+
+  for (int i = 0; i < countof(conversion_modes); i++)
+    if (conversion_modes[i].mode & result[0])
+      modes[0] = Fcons(conversion_modes[i].name, modes[0]);
+  for (int i = 0; i < countof(sentense_modes); i++)
+    if (sentense_modes[i].mode & result[1])
+      modes[1] = Fcons(sentense_modes[i].name, modes[1]);
+  modes[0] = Flist(2, modes);
+
+  return modes[0];
+}
+
+DEFUN ("ime-set-conversion_status",  Fime_set_conversion_status,
+       Sime_set_conversion_status, 1, 3, 0,
+       doc: /* Set IME mode to CMODE and SMODE. If FRAME is omitted, the selected frame is used.  */)
+  (Lisp_Object cmode, Lisp_Object smode, Lisp_Object frame)
+{
+  struct frame *f;
+
+  if (NILP(cmode) && NILP(smode))
+    return Qnil;
+
+  if (NILP (frame))
+    {
+      f = SELECTED_FRAME ();
+    }
+  else
+    {
+      CHECK_FRAME (frame);
+      f = XFRAME (frame);
+    }
+
+  HWND hwnd = FRAME_W32_WINDOW (f);
+  int ret;
+  DWORD parms[2];
+  LRESULT r;
+
+  if (NILP(cmode) || NILP(smode)) {
+    if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
+      r = SendMessage
+	(hwnd, WM_MULE_IMM_GET_CONVERSION_STATUS, 0, (DWORD_PTR) parms);
+	LeaveCriticalSection (&w32_ime_ipc_critical_section);
+      if (r == 0)
+	return Qnil;
+    } else
+      return Qnil;
+
+    if (NILP(smode))
+      parms[0] = 0;
+    else
+      parms[1] = 0;
+  } else
+    parms[0] = parms[1] = 0;
+
+  for (int i = 0; !NILP(cmode) && i < countof(conversion_modes); i++)
+    if (!NILP(Fmemq(conversion_modes[i].name, cmode)))
+      parms[0] |= conversion_modes[i].mode;
+
+  for (int i = 0; !NILP(smode) && i < countof(sentense_modes); i++)
+    if (!NILP(Fmemq(sentense_modes[i].name, smode)))
+      parms[1] |= sentense_modes[i].mode;
+
+  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
+    r = SendMessage
+      (hwnd, WM_MULE_IMM_SET_CONVERSION_STATUS, 0, (DWORD_PTR) parms);
+    LeaveCriticalSection (&w32_ime_ipc_critical_section);
+    if (r == 0)
+      return Qnil;
+  }
+  return Qnil;
+}
+static int w32_ime_disable_setopen_notification = 0;
+
+DEFUN ("ime-set-open-status", Fime_set_open_status,
+       Sime_set_open_status, 0, MANY, 0,
+       doc: /* set IME open STATUS.
+if no STATUS is given, toggle the open status  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+  HWND hwnd;
+
+#ifdef HAVE_NTGUI
+  hwnd = FRAME_W32_WINDOW (SELECTED_FRAME ());
+#else
+  hwnd = hwndConsole;
+#endif
+  if (nargs > 1)
+    xsignal2 (Qwrong_number_of_arguments,
+	      intern("ime-set-open-status"), make_number(nargs));
+
+  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
+    w32_ime_disable_setopen_notification = 1;
+    SendMessage (hwnd, WM_MULE_IMM_SET_OPEN_STATUS,
+		 nargs > 0 ? NILP(args[0]) ? 0 : 1 : -1, 0);
+  //  w32_set_ime_open_status(hwnd, nargs > 0 ? NILP(args[0]) ? 0 : 1 : -1);
+    w32_ime_disable_setopen_notification = 0;
+    LeaveCriticalSection (&w32_ime_ipc_critical_section);
+  }
+  return Qnil;
+}
+
+DEFUN ("ime-get-open-status", Fime_get_open_status,
+       Sime_get_open_status, 0, 0, 0,
+       doc: /* get IME open status.  */)
+  ()
+{
+  HWND hwnd;
+
+#ifdef HAVE_NTGUI
+  hwnd = FRAME_W32_WINDOW (SELECTED_FRAME ());
+#else
+  hwnd = hwndConsole;
+#endif
+
+  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
+    LRESULT r = SendMessage (hwnd, WM_MULE_IMM_GET_OPEN_STATUS, 0, 0);
+    LeaveCriticalSection (&w32_ime_ipc_critical_section);
+    if (r)
+      return Qt;
+  }
+  return Qnil;
+}
+extern int read_key_sequence_level;
+#endif /* USE_W32_IME */
+
 /* Main window procedure */
 
 static LRESULT CALLBACK
@@ -3708,6 +4285,75 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       }
       break;
 
+#ifdef USE_W32_IME
+    case WM_IME_NOTIFY:
+      if (wParam == IMN_SETOPENSTATUS) {
+	HIMC context;
+	if (!w32_ime_disable_setopen_notification &&
+	    (context = (*get_ime_context_fn) (hwnd))) {
+	  BOOL b = (*get_ime_open_status_fn) (context);
+	  (*release_ime_context_fn) (hwnd, context);
+	  my_post_msg(&wmsg, hwnd, msg, wParam, b);
+	}
+      }
+      goto dflt;
+      break;
+    case WM_IME_COMPOSITION:
+      HIMC context;
+      if (!(lParam & (GCS_RESULTREADSTR | GCS_RESULTREADCLAUSE |
+		      GCS_RESULTSTR | GCS_RESULTCLAUSE)) &&
+	  (read_key_sequence_level > 0 || minibuf_level > 0) &&
+	  (context = (*get_ime_context_fn) (hwnd))) {
+
+	int size = (*get_composition_string_fn)
+	  (context, GCS_COMPREADSTR, NULL, 0);
+	wchar_t *buf = alloca(size);
+
+	(*get_composition_string_fn) (context, GCS_COMPREADSTR, buf, size);
+
+	(*notify_ime_fn) (context, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
+	(*release_ime_context_fn) (hwnd, context);
+
+	DWORD imode, smode;
+	(*get_ime_conversion_status_fn) (context, &imode, &smode);
+
+	for (int i = 0; i < size / sizeof(wchar_t) ; i++) {
+	  wchar_t c = buf[i];
+	  if ((imode & IME_CMODE_ROMAN) && // romaji
+	      buf[i] >= 0xff61 && buf[i] <= 0xff9f)
+	    c = kana_roman_translation_table[buf[i] - 0xff61];
+	  post_character_message (hwnd, WM_CHAR, c, 0,
+				  w32_get_key_modifiers (c, 0));
+	}
+      }
+      goto dflt;
+#if defined(USE_IME_RECONVERTSTRING) || defined(USE_IME_DOCUMENTFEED)
+    case WM_IME_REQUEST:
+      DWORD req_len = DOCUMENTFEED_REQ_LENG;
+      switch (wParam) {
+      case IMR_RECONVERTSTRING:
+	req_len = RECONVERTSTRING_REQ_LENG;
+	/* fall through */
+      case IMR_DOCUMENTFEED:
+	if (! w32_get_ime_open_status(hwnd))
+	  return 0;
+	if (lParam) {
+	  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
+	    LRESULT r;
+	    r = ime_request_string(hwnd, wParam, lParam);
+	    LeaveCriticalSection(&w32_ime_ipc_critical_section);
+	    return r;
+	  }
+	  return 0;
+	} else
+	  return req_len;
+	break;
+      default:
+	break;
+      }
+      goto dflt;
+#endif
+#else
     case WM_IME_CHAR:
       /* If we can't get the IME result as Unicode, use default processing,
 	 which will at least allow characters decodable in the system locale
@@ -3743,9 +4389,14 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	ignore_ime_char--;
 
       break;
+#endif /* USE_W32_IME */
 
     case WM_IME_STARTCOMPOSITION:
+#ifndef USE_W32_IME
       if (!set_ime_composition_window_fn)
+#else
+      if (!set_ime_composition_window_fn || !notify_ime_fn)
+#endif
 	goto dflt;
       else
 	{
@@ -3804,6 +4455,7 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	 dialog boxes, such as the file selection dialog or font
 	 selection dialog.  So something else is needed to fix the
 	 former without breaking the latter.  See bug#11732.  */
+      goto dflt; // display candidates
       break;
 
     case WM_IME_ENDCOMPOSITION:
@@ -4557,6 +5209,26 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_EMACS_FILENOTIFY:
       my_post_msg (&wmsg, hwnd, msg, wParam, lParam);
       return 1;
+
+#ifdef USE_W32_IME
+    case WM_MULE_IMM_GET_OPEN_STATUS:
+      return w32_get_ime_open_status (hwnd);
+      break;
+    case WM_MULE_IMM_SET_OPEN_STATUS:
+      return w32_set_ime_open_status (hwnd, wParam);
+      break;
+      {
+	LPDWORD p;
+      case WM_MULE_IMM_GET_CONVERSION_STATUS:
+	p = (LPDWORD) lParam;
+	return w32_get_ime_conversion_status (hwnd, p, p + 1);
+	break;
+      case WM_MULE_IMM_SET_CONVERSION_STATUS:
+	p = (LPDWORD) lParam;
+	return w32_set_ime_conversion_status (hwnd, p[0], p[1]);
+	break;
+      }
+#endif /* USE_W32_IME */
 
     default:
       /* Check for messages registered at runtime. */
@@ -9295,6 +9967,50 @@ syms_of_w32fns (void)
   DEFSYM (QCtitle, ":title");
   DEFSYM (QCbody, ":body");
 #endif
+#ifdef USE_W32_IME
+  DEFSYM (Qime_cmode_alphanumeric, "cmode-alphanumeric");
+  DEFSYM (Qime_cmode_charcode, "cmode-charcode");
+  DEFSYM (Qime_cmode_eudc, "cmode-eudc");
+  DEFSYM (Qime_cmode_fixed, "cmode-fixed");
+  DEFSYM (Qime_cmode_fullshape, "cmode-fullshape");
+  DEFSYM (Qime_cmode_hanjaconvert, "cmode-hanjaconvert");
+  DEFSYM (Qime_cmode_katakana, "cmode-katakana");
+  DEFSYM (Qime_cmode_native, "cmode-native");
+  DEFSYM (Qime_cmode_noconversion, "cmode-noconversion");
+  DEFSYM (Qime_cmode_roman, "cmode-roman");
+  DEFSYM (Qime_cmode_softkbd, "cmode-softkbd");
+  DEFSYM (Qime_cmode_symbol, "cmode-symbol");
+  DEFSYM (Qime_smode_automatic, "smode-automatic");
+  DEFSYM (Qime_smode_none, "smode-none");
+  DEFSYM (Qime_smode_phrasepredict, "smode-phrasepredict");
+  DEFSYM (Qime_smode_plauralclause, "smode-pluralclause");
+  DEFSYM (Qime_smode_singleconvert, "smode-singleconvert");
+  DEFSYM (Qime_smode_conversation, "smode-conversation");
+
+#define setup_array(e, s) {e, s}
+  struct ime_mode cmodes[] = {
+    CMODES(setup_array)
+  }, smodes[] = {
+    SMODES(setup_array)
+  };
+  for (int i = 0; i < countof(cmodes); i++)
+    conversion_modes[i] = cmodes[i];
+  for (int i = 0; i < countof(smodes); i++)
+    sentense_modes[i] = smodes[i];
+
+
+  {
+    Lisp_Object sf = Qnil;
+    sf = Fcons(intern_c_string("core"), sf);
+#if defined (USE_IME_DOCUMENTFEED)
+    sf = Fcons(intern_c_string("document-feed"), sf);
+#endif
+#if defined (USE_IME_RECONVERTSTRING)
+    sf = Fcons(intern_c_string("reconversion"), sf);
+#endif
+    Fprovide (intern_c_string ("windows-ime"), sf);
+  }
+#endif
 
   /* Symbols used elsewhere, but only in MS-Windows-specific code.  */
   DEFSYM (Qgnutls_dll, "gnutls");
@@ -9653,6 +10369,13 @@ This variable has effect only on Windows Vista and later.  */);
 #ifdef WINDOWSNT
   defsubr (&Ssystem_move_file_to_trash);
 #endif
+
+#ifdef USE_W32_IME
+  defsubr (&Sime_get_open_status);
+  defsubr (&Sime_set_open_status);
+  defsubr (&Sime_set_conversion_status);
+  defsubr (&Sime_get_conversion_status);
+#endif
 }
 
 
@@ -9906,7 +10629,11 @@ globals_of_w32fns (void)
     GetProcAddress (user32_lib, "GetTitleBarInfo");
 
   {
+#ifdef USE_W32_IME
+    HMODULE imm32_lib = LoadLibrary ("imm32.dll");
+#else
     HMODULE imm32_lib = GetModuleHandle ("imm32.dll");
+#endif
     get_composition_string_fn = (ImmGetCompositionString_Proc)
       GetProcAddress (imm32_lib, "ImmGetCompositionStringW");
     get_ime_context_fn = (ImmGetContext_Proc)
@@ -9915,6 +10642,20 @@ globals_of_w32fns (void)
       GetProcAddress (imm32_lib, "ImmReleaseContext");
     set_ime_composition_window_fn = (ImmSetCompositionWindow_Proc)
       GetProcAddress (imm32_lib, "ImmSetCompositionWindow");
+#ifdef USE_W32_IME
+    notify_ime_fn = (ImmNotifyIME_Proc)
+      GetProcAddress (imm32_lib, "ImmNotifyIME");
+    get_ime_conversion_status_fn = (ImmGetConversionStatus_Proc)
+      GetProcAddress (imm32_lib, "ImmGetConversionStatus");
+    set_ime_conversion_status_fn = (ImmSetConversionStatus_Proc)
+      GetProcAddress (imm32_lib, "ImmSetConversionStatus");
+    get_ime_open_status_fn = (ImmGetOpenStatus_Proc)
+      GetProcAddress (imm32_lib, "ImmGetOpenStatus");
+    set_ime_open_status_fn =(ImmSetOpenStatus_Proc)
+      GetProcAddress (imm32_lib, "ImmSetOpenStatus");
+
+    InitializeCriticalSection(&w32_ime_ipc_critical_section);
+#endif /* USE_W32_IME */
   }
 
   except_code = 0;
