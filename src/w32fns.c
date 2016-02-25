@@ -3743,7 +3743,8 @@ DEFUN ("ime-set-kana-roman-translation-table",
        Fime_set_kana_roman_translation_table,
        Sime_set_kana_roman_translation_table, 1, 1, 0,
        doc: /* set Ime kana roman translation TABLE.
-TABLE should be 101, 106 or vector  */)
+TABLE should be 101, 106 or vector.
+This TABLE will be used at temporary no-conversion mode*/)
   (Lisp_Object table)
 {
   if (INTEGERP (table))
