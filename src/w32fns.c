@@ -3380,8 +3380,8 @@ static EMACS_INT compstr_end_pos(int max_char)
 
 /* main thread */
 static LRESULT
-get_request_string (RECONVERTSTRING *reconv,
-		    wchar_t *compstr)
+get_request_string (RECONVERTSTRING *const reconv,
+		    wchar_t * const compstr)
 {
   EMACS_INT pt, pt_byte, start, end, len, t_start, t_end, compstr_len;
 
@@ -3447,44 +3447,29 @@ get_request_string (RECONVERTSTRING *reconv,
     }
 
   len = end - start;
-  if (reconv)
-    {
-      int pos;
-      WCHAR *s;
 
-      s = (WCHAR *) (reconv + 1);
+  {
+    int pos;
+    WCHAR *s = (WCHAR *) (reconv + 1);
 
-      for (pos = start; pos < t_start; pos++)
-	*s++ = (WCHAR) FETCH_CHAR (CHAR_TO_BYTE (pos));
+    for (pos = start; pos < t_start; pos++)
+      *s++ = (WCHAR) FETCH_CHAR (CHAR_TO_BYTE (pos));
 
-      if (compstr)
-	{
-	  for (compstr_len = 0; compstr[compstr_len]; compstr_len++)
-	    *s++ = compstr[compstr_len];
+    if (compstr)
+      {
+	for (compstr_len = 0; compstr[compstr_len]; compstr_len++)
+	  *s++ = compstr[compstr_len];
 
-	  len += compstr_len;
-	}
-      else
-	compstr_len = t_end - t_start;
+	len += compstr_len;
+      }
+    else
+      compstr_len = t_end - t_start;
 
-      for (; pos < end; pos++)
-	*s++ = (WCHAR) FETCH_CHAR (CHAR_TO_BYTE (pos));
+    for (; pos < end; pos++)
+      *s++ = (WCHAR) FETCH_CHAR (CHAR_TO_BYTE (pos));
 
-      *s = 0;
-    }
-  else
-    {
-      SET_PT_BOTH (pt, pt_byte);
-      if (compstr)
-	{
-	  for (compstr_len = 0; compstr[compstr_len]; compstr_len++)
-	    ;
-
-	  len += compstr_len;
-	}
-      return (sizeof (RECONVERTSTRING) + (len + 1) * sizeof(wchar_t));
-    }
-
+    *s = 0;
+  }
   reconv->dwStrOffset = sizeof (RECONVERTSTRING);
   reconv->dwStrLen = len;
   reconv->dwCompStrOffset =
@@ -4259,18 +4244,17 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       goto dflt;
 #if defined(USE_IME_RECONVERTSTRING) || defined(USE_IME_DOCUMENTFEED)
     case WM_IME_REQUEST:
-      DWORD req_len = DOCUMENTFEED_REQ_LENG;
       switch (wParam) {
       case IMR_RECONVERTSTRING:
-	req_len = RECONVERTSTRING_REQ_LENG;
-	/* fall through */
       case IMR_DOCUMENTFEED:
 	if (! w32_get_ime_open_status(hwnd))
 	  return 0;
 	if (lParam)
 	  return ime_request_string(hwnd, msg, wParam, lParam);
 	else
-	  return req_len;
+	  return wParam == IMR_RECONVERTSTRING
+	    ? RECONVERTSTRING_REQ_LENG
+	    : DOCUMENTFEED_REQ_LENG;
 	break;
       default:
 	break;
