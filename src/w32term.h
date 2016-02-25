@@ -864,9 +864,8 @@ extern Lisp_Object w32_popup_dialog (struct frame *, Lisp_Object, Lisp_Object);
 extern void w32_arrow_cursor (void);
 
 #if defined (USE_IME_RECONVERTSTRING) || defined (USE_IME_DOCUMENTFEEDSTRING)
-void w32_request_string(struct ime_requrst_string *req);
+void w32_request_string(HWND, UINT, struct ime_requrst_string *req);
 #endif
-LRESULT w32_send_message(HWND, UINT, WPARAM, LPARAM);
 
 extern void syms_of_w32term (void);
 extern void syms_of_w32menu (void);

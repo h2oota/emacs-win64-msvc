@@ -224,22 +224,6 @@ GetTitleBarInfo_Proc get_title_bar_info_fn = NULL;
 extern AppendMenuW_Proc unicode_append_menu;
 #endif /* NTGUI_UNICODE */
 
-#ifdef USE_W32_IME
-static CRITICAL_SECTION w32_ime_ipc_critical_section;
-LRESULT w32_send_message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
-  EnterCriticalSection(&w32_ime_ipc_critical_section);
-  LRESULT r = SendMessage(hwnd, msg, wparam, lparam);
-  LeaveCriticalSection (&w32_ime_ipc_critical_section);
-  return r;
-}
-#else
-LRESULT w32_send_message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
-  return SendMessage(hwnd, msg, wparam, lparam);
-}
-#endif
-
 /* Flag to selectively ignore WM_IME_CHAR messages.  */
 static int ignore_ime_char = 0;
 
@@ -3361,24 +3345,6 @@ w32_set_ime_open_status (HWND hwnd, int openp)
   return ret;
 }
 
-static int
-w32_get_ime_conversion_status (HWND hwnd, LPDWORD cmode, LPDWORD smode)
-{
-  HIMC context = (*get_ime_context_fn) (hwnd);
-  int ret = (*get_ime_conversion_status_fn) (context, cmode, smode);
-  (*release_ime_context_fn) (hwnd, context);
-  return ret;
-}
-
-static int
-w32_set_ime_conversion_status (HWND hwnd, DWORD cmode, DWORD smode)
-{
-  HIMC context = (*get_ime_context_fn) (hwnd);
-  int ret = (*set_ime_conversion_status_fn) (context, cmode, smode);
-  (*release_ime_context_fn) (hwnd, context);
-  return ret;
-}
-
 
 /*
  * RECONVERTSTRING, DOCUMENTFEED
@@ -3508,7 +3474,6 @@ get_request_string (RECONVERTSTRING *reconv,
     }
   else
     {
-      emacs_abort();
       SET_PT_BOTH (pt, pt_byte);
       if (compstr)
 	{
@@ -3539,40 +3504,33 @@ get_request_string (RECONVERTSTRING *reconv,
 struct ime_requrst_string {
   RECONVERTSTRING *reconv;
   wchar_t  *compstr;
-  LRESULT  lresult;
-  HANDLE   s;
 };
 /* called from main thread */
-void w32_request_string(struct ime_requrst_string *req)
+void w32_request_string(HWND hwnd, UINT msg, struct ime_requrst_string *req)
 {
-  req->lresult = get_request_string(req->reconv, req->compstr);
-  // signal to GUI thread
-  ReleaseSemaphore(req->s, 1, NULL);
+  complete_deferred_msg (hwnd, msg,
+			 get_request_string(req->reconv, req->compstr));
 }
 
 /* called from w32 gui thread */
 static LRESULT
-ime_request_string (HWND hwnd,
+ime_request_string (HWND hwnd, UINT msg,
 		    WPARAM wParam, LPARAM lParam)
 {
   struct ime_requrst_string request = {
-    .lresult = 0,
     .reconv = (RECONVERTSTRING *)lParam,
-    .s = CreateSemaphore(NULL, 0, 1, NULL),
   };
-  if (request.s == INVALID_HANDLE_VALUE)
-    return 0;
 
 #ifdef USE_IME_DOCUMENTFEED
   if (wParam == IMR_DOCUMENTFEED) {
     HIMC context  = (*get_ime_context_fn)(hwnd);
     if (!context)
-      goto done;
+      return FALSE;
 
     if ((get_composition_string_fn) (context, GCS_COMPSTR, NULL, 0)
 	>= DOCFEED_CSTR_LENG * sizeof(wchar_t))	{
       (*release_ime_context_fn) (hwnd, context);
-      goto done;
+      return FALSE;
     }
 
     request.compstr = alloca(DOCFEED_CSTR_LENG * sizeof(wchar_t));
@@ -3594,16 +3552,11 @@ ime_request_string (HWND hwnd,
   }
 #endif
 
-  W32Msg msg = {0};
-  // request to main thread */
-  my_post_msg(&msg, NULL, WM_MULE_IMM_REQURST_STRING, 0, (LPARAM)&request);
-  // wait
-  if (WaitForSingleObject(request.s, INFINITE) != WAIT_OBJECT_0)
+  deferred_msg msg_buf;
+  if (find_deferred_msg (hwnd, msg) != NULL)
     emacs_abort ();
-
- done:
-  CloseHandle(request.s);
-  return request.lresult;
+  return send_deferred_msg (&msg_buf, hwnd, WM_MULE_IMM_REQURST_STRING,
+			    wParam, (LPARAM)&request);
 }
 #endif
 
@@ -3687,13 +3640,8 @@ t means status of IME is open.  nil means it is close.  */)
   HWND hwnd = FRAME_W32_WINDOW (f);
   DWORD result[2];
 
-  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
-    LRESULT r = SendMessage
-      (hwnd, WM_MULE_IMM_GET_CONVERSION_STATUS, 0, (DWORD_PTR) result);
-    LeaveCriticalSection (&w32_ime_ipc_critical_section);
-    if (r == 0)
-      return Qnil;
-  } else
+  if (!SendMessage (hwnd, WM_MULE_IMM_GET_CONVERSION_STATUS,
+		    0, (DWORD_PTR) result))
     return Qnil;
 
   Lisp_Object modes[2] = {
@@ -3735,16 +3683,10 @@ DEFUN ("ime-set-conversion_status",  Fime_set_conversion_status,
   HWND hwnd = FRAME_W32_WINDOW (f);
   int ret;
   DWORD parms[2];
-  LRESULT r;
 
   if (NILP(cmode) || NILP(smode)) {
-    if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
-      r = SendMessage
-	(hwnd, WM_MULE_IMM_GET_CONVERSION_STATUS, 0, (DWORD_PTR) parms);
-	LeaveCriticalSection (&w32_ime_ipc_critical_section);
-      if (r == 0)
-	return Qnil;
-    } else
+    if (!SendMessage
+	(hwnd, WM_MULE_IMM_GET_CONVERSION_STATUS, 0, (DWORD_PTR) parms))
       return Qnil;
 
     if (NILP(smode))
@@ -3762,14 +3704,11 @@ DEFUN ("ime-set-conversion_status",  Fime_set_conversion_status,
     if (!NILP(Fmemq(sentense_modes[i].name, smode)))
       parms[1] |= sentense_modes[i].mode;
 
-  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
-    r = SendMessage
-      (hwnd, WM_MULE_IMM_SET_CONVERSION_STATUS, 0, (DWORD_PTR) parms);
-    LeaveCriticalSection (&w32_ime_ipc_critical_section);
-    if (r == 0)
-      return Qnil;
-  }
-  return Qnil;
+
+  if (!SendMessage (hwnd, WM_MULE_IMM_SET_CONVERSION_STATUS,
+		    0, (DWORD_PTR) parms))
+    return Qnil;
+  return Qt;
 }
 static int w32_ime_disable_setopen_notification = 0;
 
@@ -3790,15 +3729,10 @@ if no STATUS is given, toggle the open status  */)
     xsignal2 (Qwrong_number_of_arguments,
 	      intern("ime-set-open-status"), make_number(nargs));
 
-  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
-    w32_ime_disable_setopen_notification = 1;
+  return
     SendMessage (hwnd, WM_MULE_IMM_SET_OPEN_STATUS,
-		 nargs > 0 ? NILP(args[0]) ? 0 : 1 : -1, 0);
-  //  w32_set_ime_open_status(hwnd, nargs > 0 ? NILP(args[0]) ? 0 : 1 : -1);
-    w32_ime_disable_setopen_notification = 0;
-    LeaveCriticalSection (&w32_ime_ipc_critical_section);
-  }
-  return Qnil;
+		 nargs > 0 ? NILP(args[0]) ? 0 : 1 : -1, 0)
+    ? Qt : Qnil;
 }
 
 DEFUN ("ime-get-open-status", Fime_get_open_status,
@@ -3814,13 +3748,9 @@ DEFUN ("ime-get-open-status", Fime_get_open_status,
   hwnd = hwndConsole;
 #endif
 
-  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
-    LRESULT r = SendMessage (hwnd, WM_MULE_IMM_GET_OPEN_STATUS, 0, 0);
-    LeaveCriticalSection (&w32_ime_ipc_critical_section);
-    if (r)
-      return Qt;
-  }
-  return Qnil;
+  return
+    SendMessage (hwnd, WM_MULE_IMM_GET_OPEN_STATUS, 0, 0)
+    ? Qt : Qnil;
 }
 extern int read_key_sequence_level;
 #endif /* USE_W32_IME */
@@ -4337,15 +4267,9 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       case IMR_DOCUMENTFEED:
 	if (! w32_get_ime_open_status(hwnd))
 	  return 0;
-	if (lParam) {
-	  if (TryEnterCriticalSection(&w32_ime_ipc_critical_section)) {
-	    LRESULT r;
-	    r = ime_request_string(hwnd, wParam, lParam);
-	    LeaveCriticalSection(&w32_ime_ipc_critical_section);
-	    return r;
-	  }
-	  return 0;
-	} else
+	if (lParam)
+	  return ime_request_string(hwnd, msg, wParam, lParam);
+	else
 	  return req_len;
 	break;
       default:
@@ -5217,17 +5141,23 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_MULE_IMM_SET_OPEN_STATUS:
       return w32_set_ime_open_status (hwnd, wParam);
       break;
+    case WM_MULE_IMM_GET_CONVERSION_STATUS:
+    case WM_MULE_IMM_SET_CONVERSION_STATUS:
       {
-	LPDWORD p;
-      case WM_MULE_IMM_GET_CONVERSION_STATUS:
-	p = (LPDWORD) lParam;
-	return w32_get_ime_conversion_status (hwnd, p, p + 1);
-	break;
-      case WM_MULE_IMM_SET_CONVERSION_STATUS:
-	p = (LPDWORD) lParam;
-	return w32_set_ime_conversion_status (hwnd, p[0], p[1]);
-	break;
+	LPDWORD p = (LPDWORD) lParam;
+	LRESULT r;
+	HIMC context = (*get_ime_context_fn) (hwnd);
+	if (context) {
+	  if (msg == WM_MULE_IMM_GET_CONVERSION_STATUS)
+	    r = (*get_ime_conversion_status_fn) (context, p, p + 1);
+	  else
+	    r = (*set_ime_conversion_status_fn) (context, p[0], p[1]);
+	  (*release_ime_context_fn) (hwnd, context);
+	} else
+	  r = 0;
+	return r;
       }
+      break;
 #endif /* USE_W32_IME */
 
     default:
@@ -10654,7 +10584,6 @@ globals_of_w32fns (void)
     set_ime_open_status_fn =(ImmSetOpenStatus_Proc)
       GetProcAddress (imm32_lib, "ImmSetOpenStatus");
 
-    InitializeCriticalSection(&w32_ime_ipc_critical_section);
 #endif /* USE_W32_IME */
   }
 

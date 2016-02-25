@@ -550,7 +550,7 @@ x_update_window_begin (struct window *w)
   /* Hide the system caret during an update.  */
   if (w32_use_visible_system_caret && w32_system_caret_hwnd)
     {
-      w32_send_message (w32_system_caret_hwnd, WM_EMACS_HIDE_CARET, 0, 0);
+      SendMessage (w32_system_caret_hwnd, WM_EMACS_HIDE_CARET, 0, 0);
     }
 
   w->output_cursor = w->cursor;
@@ -714,7 +714,7 @@ x_update_window_end (struct window *w, bool cursor_on_p,
      x_update_window_begin.  */
   if (w32_use_visible_system_caret && w32_system_caret_hwnd)
     {
-      w32_send_message (w32_system_caret_hwnd, WM_EMACS_SHOW_CARET, 0, 0);
+      SendMessage (w32_system_caret_hwnd, WM_EMACS_SHOW_CARET, 0, 0);
     }
 }
 
@@ -3633,7 +3633,7 @@ w32_set_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
 static HWND
 my_create_vscrollbar (struct frame * f, struct scroll_bar * bar)
 {
-  return (HWND) w32_send_message (FRAME_W32_WINDOW (f),
+  return (HWND) SendMessage (FRAME_W32_WINDOW (f),
 			     WM_EMACS_CREATEVSCROLLBAR, (WPARAM) f,
 			     (LPARAM) bar);
 }
@@ -3641,7 +3641,7 @@ my_create_vscrollbar (struct frame * f, struct scroll_bar * bar)
 static HWND
 my_create_hscrollbar (struct frame * f, struct scroll_bar * bar)
 {
-  return (HWND) w32_send_message (FRAME_W32_WINDOW (f),
+  return (HWND) SendMessage (FRAME_W32_WINDOW (f),
 			     WM_EMACS_CREATEHSCROLLBAR, (WPARAM) f,
 			     (LPARAM) bar);
 }
@@ -3652,7 +3652,7 @@ static BOOL
 my_show_window (struct frame *f, HWND hwnd, int how)
 {
 #ifndef ATTACH_THREADS
-  return w32_send_message (FRAME_W32_WINDOW (f), WM_EMACS_SHOWWINDOW,
+  return SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_SHOWWINDOW,
 		      (WPARAM) hwnd, (LPARAM) how);
 #else
   return ShowWindow (hwnd, how);
@@ -3671,7 +3671,7 @@ my_set_window_pos (HWND hwnd, HWND hwndAfter,
   pos.cx = cx;
   pos.cy = cy;
   pos.flags = flags;
-  w32_send_message (hwnd, WM_EMACS_SETWINDOWPOS, (WPARAM) &pos, 0);
+  SendMessage (hwnd, WM_EMACS_SETWINDOWPOS, (WPARAM) &pos, 0);
 #else
   SetWindowPos (hwnd, hwndAfter, x, y, cx, cy, flags);
 #endif
@@ -3681,7 +3681,7 @@ my_set_window_pos (HWND hwnd, HWND hwndAfter,
 static void
 my_set_focus (struct frame * f, HWND hwnd)
 {
-  w32_send_message (FRAME_W32_WINDOW (f), WM_EMACS_SETFOCUS,
+  SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_SETFOCUS,
 	       (WPARAM) hwnd, 0);
 }
 #endif
@@ -3689,21 +3689,21 @@ my_set_focus (struct frame * f, HWND hwnd)
 static void
 my_set_foreground_window (HWND hwnd)
 {
-  w32_send_message (hwnd, WM_EMACS_SETFOREGROUND, (WPARAM) hwnd, 0);
+  SendMessage (hwnd, WM_EMACS_SETFOREGROUND, (WPARAM) hwnd, 0);
 }
 
 
 static void
 my_destroy_window (struct frame * f, HWND hwnd)
 {
-  w32_send_message (FRAME_W32_WINDOW (f), WM_EMACS_DESTROYWINDOW,
+  SendMessage (FRAME_W32_WINDOW (f), WM_EMACS_DESTROYWINDOW,
 	       (WPARAM) hwnd, 0);
 }
 
 static void
 my_bring_window_to_top (HWND hwnd)
 {
-  w32_send_message (hwnd, WM_EMACS_BRINGTOTOP, (WPARAM) hwnd, 0);
+  SendMessage (hwnd, WM_EMACS_BRINGTOTOP, (WPARAM) hwnd, 0);
 }
 
 /* Create a scroll bar and return the scroll bar vector for it.  W is
@@ -5313,7 +5313,8 @@ w32_read_socket (struct terminal *terminal,
 	  break;
 #if defined(USE_IME_RECONVERTSTRING) || defined(USE_IME_DOCUMENTFEED)
 	case WM_MULE_IMM_REQURST_STRING:
-	  w32_request_string((struct ime_requrst_string *)msg.msg.lParam);
+	  w32_request_string(msg.msg.hwnd, msg.msg.message,
+			     (struct ime_requrst_string *)msg.msg.lParam);
 	  break;
 #endif
 #endif
@@ -6523,7 +6524,7 @@ x_iconify_frame (struct frame *f)
   x_set_bitmap_icon (f);
 
   /* Simulate the user minimizing the frame.  */
-  w32_send_message (FRAME_W32_WINDOW (f), WM_SYSCOMMAND, SC_MINIMIZE, 0);
+  SendMessage (FRAME_W32_WINDOW (f), WM_SYSCOMMAND, SC_MINIMIZE, 0);
 
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, true);
