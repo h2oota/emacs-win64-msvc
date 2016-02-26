@@ -570,6 +570,7 @@ typedef unsigned __int64 EMACS_UINT;
 #  define pI			  "I64"
 #  define PRIdMAX		  "I64d"
 #  define PRIxMAX		  "I64x"
+#  define PRIxPTR		  "I64x"
 /* Fix a bug in MSVC headers : stdint.h */
 #  define _INTPTR 2
 # elif defined(_WIN32)
@@ -593,6 +594,7 @@ typedef unsigned int EMACS_UINT;
 #   define pI			  "I32"
 #   define PRIdMAX                "I32d"
 #   define PRIxMAX		  "I32x"
+#   define PRIxPTR		  "I32x"
 #  endif
 # endif
 #endif

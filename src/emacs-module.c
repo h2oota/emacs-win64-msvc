@@ -144,14 +144,14 @@ static emacs_value const module_nil = 0;
    signal or throw is caught.  */
 // TODO: Have Fsignal check for CATCHER_ALL so we only have to install
 // one handler.
-#define MODULE_HANDLE_NONLOCAL_EXIT(retval)                     \
-  MODULE_SETJMP (CONDITION_CASE, module_handle_signal, retval); \
-  MODULE_SETJMP (CATCHER_ALL, module_handle_throw, retval)
+#define MODULE_HANDLE_NONLOCAL_EXIT(...)			      \
+  MODULE_SETJMP (CONDITION_CASE, module_handle_signal, __VA_ARGS__); \
+  MODULE_SETJMP (CATCHER_ALL, module_handle_throw, __VA_ARGS__)
 
-#define MODULE_SETJMP(handlertype, handlerfunc, retval)			       \
-  MODULE_SETJMP_1 (handlertype, handlerfunc, retval,			       \
+#define MODULE_SETJMP(handlertype, handlerfunc, ...)			       \
+  MODULE_SETJMP_1 (handlertype, handlerfunc,			       \
 		   internal_handler_##handlertype,			       \
-		   internal_cleanup_##handlertype)
+		   internal_cleanup_##handlertype, __VA_ARGS__)
 
 /* It is very important that pushing the handler doesn't itself raise
    a signal.  Install the cleanup only after the handler has been
@@ -165,23 +165,54 @@ static emacs_value const module_nil = 0;
 
 // TODO: Make backtraces work if this macros is used.
 
-#define MODULE_SETJMP_1(handlertype, handlerfunc, retval, c, dummy)	\
+
+#ifdef _MSC_VER
+#define MODULE_SETJMP_1(handlertype, handlerfunc, c, dummy, ...)	\
   if (module_non_local_exit_check (env) != emacs_funcall_exit_return)	\
-    return retval;							\
+    return __VA_ARGS__;						\
   struct handler *c = push_handler_nosignal (Qt, handlertype);		\
   if (!c)								\
     {									\
       module_out_of_memory (env);					\
-      return retval;							\
+      return __VA_ARGS__;						\
+    }									\
+  int dummy;								\
+  __try {								\
+  if (sys_setjmp (c->jmp))						\
+    {									\
+      (handlerfunc) (env, c->val);					\
+      return __VA_ARGS__;						\
+    }									\
+  do { } while (false)
+#define MODULE_FUNCTION_END(...)					\
+  MODULE_FUNCTION_END_1 (CATCHER_ALL);					\
+  MODULE_FUNCTION_END_1 (CONDITION_CASE);				\
+  return __VA_ARGS__
+#define MODULE_FUNCTION_END_1(handlertype)				\
+  }  __finally {							\
+    module_reset_handlerlist(&internal_cleanup_##handlertype);		\
+     }									\
+  do { } while(false)
+#else
+#define MODULE_SETJMP_1(handlertype, handlerfunc, c, dummy, ...)	\
+  if (module_non_local_exit_check (env) != emacs_funcall_exit_return)	\
+    return __VA_ARGS__;						\
+  struct handler *c = push_handler_nosignal (Qt, handlertype);		\
+  if (!c)								\
+    {									\
+      module_out_of_memory (env);					\
+      return __VA_ARGS__;						\
     }									\
   verify (module_has_cleanup);						\
   int dummy __attribute__ ((cleanup (module_reset_handlerlist)));	\
   if (sys_setjmp (c->jmp))						\
     {									\
       (handlerfunc) (env, c->val);					\
-      return retval;							\
+      return __VA_ARGS__;						\
     }									\
   do { } while (false)
+#define MOUDLE_FUNCTION_END(...)
+#endif
 
 
 /* Function environments.  */
@@ -237,11 +268,12 @@ struct module_fun_env
    environment functions.  On error it will return its argument, which
    should be a sentinel value.  */
 
-#define MODULE_FUNCTION_BEGIN(error_retval)                             \
+#define MODULE_FUNCTION_BEGIN(...)                             \
   check_main_thread ();                                                 \
   if (module_non_local_exit_check (env) != emacs_funcall_exit_return)   \
-    return error_retval;                                                \
-  MODULE_HANDLE_NONLOCAL_EXIT (error_retval)
+    return __VA_ARGS__;                                                \
+  MODULE_HANDLE_NONLOCAL_EXIT (__VA_ARGS__)
+
 
 /* Catch signals and throws only if the code can actually signal or
    throw.  If checking is enabled, abort if the current thread is not
@@ -284,6 +316,7 @@ module_make_global_ref (emacs_env *env, emacs_value ref)
     }
 
   return lisp_to_value (new_obj);
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static void
@@ -310,6 +343,7 @@ module_free_global_ref (emacs_env *env, emacs_value ref)
       else
 	hash_remove_from_table (h, value);
     }
+  MODULE_FUNCTION_END ();
 }
 
 static enum emacs_funcall_exit
@@ -402,6 +436,7 @@ module_make_function (emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
                                   Qargs));
 
   return lisp_to_value (ret);
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static emacs_value
@@ -421,6 +456,7 @@ module_funcall (emacs_env *env, emacs_value fun, ptrdiff_t nargs,
   emacs_value result = lisp_to_value (Ffuncall (nargs + 1, newargs));
   SAFE_FREE ();
   return result;
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static emacs_value
@@ -428,6 +464,7 @@ module_intern (emacs_env *env, const char *name)
 {
   MODULE_FUNCTION_BEGIN (module_nil);
   return lisp_to_value (intern (name));
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static emacs_value
@@ -435,6 +472,7 @@ module_type_of (emacs_env *env, emacs_value value)
 {
   MODULE_FUNCTION_BEGIN (module_nil);
   return lisp_to_value (Ftype_of (value_to_lisp (value)));
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static bool
@@ -466,6 +504,7 @@ module_extract_integer (emacs_env *env, emacs_value n)
       return 0;
     }
   return XINT (l);
+  MODULE_FUNCTION_END (0);
 }
 
 static emacs_value
@@ -478,6 +517,7 @@ module_make_integer (emacs_env *env, intmax_t n)
       return module_nil;
     }
   return lisp_to_value (make_number (n));
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static double
@@ -491,6 +531,7 @@ module_extract_float (emacs_env *env, emacs_value f)
       return 0;
     }
   return XFLOAT_DATA (lisp);
+  MODULE_FUNCTION_END (0);
 }
 
 static emacs_value
@@ -498,6 +539,7 @@ module_make_float (emacs_env *env, double d)
 {
   MODULE_FUNCTION_BEGIN (module_nil);
   return lisp_to_value (make_float (d));
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static bool
@@ -542,6 +584,7 @@ module_copy_string_contents (emacs_env *env, emacs_value value, char *buffer,
   memcpy (buffer, SDATA (lisp_str_utf8), raw_size + 1);
 
   return true;
+  MODULE_FUNCTION_END (false);
 }
 
 static emacs_value
@@ -555,6 +598,7 @@ module_make_string (emacs_env *env, const char *str, ptrdiff_t length)
     }
   Lisp_Object lstr = make_unibyte_string (str, length);
   return lisp_to_value (code_convert_string_norecord (lstr, Qutf_8, false));
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static emacs_value
@@ -562,6 +606,7 @@ module_make_user_ptr (emacs_env *env, emacs_finalizer_function fin, void *ptr)
 {
   MODULE_FUNCTION_BEGIN (module_nil);
   return lisp_to_value (make_user_ptr (fin, ptr));
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static void *
@@ -575,6 +620,7 @@ module_get_user_ptr (emacs_env *env, emacs_value uptr)
       return NULL;
     }
   return XUSER_PTR (lisp)->p;
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static void
@@ -589,6 +635,7 @@ module_set_user_ptr (emacs_env *env, emacs_value uptr, void *ptr)
   if (! USER_PTRP (lisp))
     module_wrong_type (env, Quser_ptr, lisp);
   XUSER_PTR (lisp)->p = ptr;
+  MODULE_FUNCTION_END ();
 }
 
 static emacs_finalizer_function
@@ -602,6 +649,7 @@ module_get_user_finalizer (emacs_env *env, emacs_value uptr)
       return NULL;
     }
   return XUSER_PTR (lisp)->finalizer;
+  MODULE_FUNCTION_END (NULL);
 }
 
 static void
@@ -614,6 +662,7 @@ module_set_user_finalizer (emacs_env *env, emacs_value uptr,
   if (! USER_PTRP (lisp))
     module_wrong_type (env, Quser_ptr, lisp);
   XUSER_PTR (lisp)->finalizer = fin;
+  MODULE_FUNCTION_END ();
 }
 
 static void
@@ -636,6 +685,7 @@ module_vec_set (emacs_env *env, emacs_value vec, ptrdiff_t i, emacs_value val)
       return;
     }
   ASET (lvec, i, value_to_lisp (val));
+  MODULE_FUNCTION_END ();
 }
 
 static emacs_value
@@ -657,6 +707,7 @@ module_vec_get (emacs_env *env, emacs_value vec, ptrdiff_t i)
       return module_nil;
     }
   return lisp_to_value (AREF (lvec, i));
+  MODULE_FUNCTION_END (module_nil);
 }
 
 static ptrdiff_t
@@ -671,6 +722,7 @@ module_vec_size (emacs_env *env, emacs_value vec)
       return 0;
     }
   return ASIZE (lvec);
+  MODULE_FUNCTION_END (0);
 }
 
 
