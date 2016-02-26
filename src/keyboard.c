@@ -224,7 +224,7 @@ Lisp_Object internal_last_event_frame;
 static Lisp_Object read_key_sequence_cmd;
 static Lisp_Object read_key_sequence_remapped;
 #ifdef USE_W32_IME
-int read_key_sequence_level = 0;
+int current_ime_status = 0;
 #endif
 
 /* File in which we write all commands we read.  */
@@ -8881,8 +8881,7 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
   /* IME support */
 #ifdef USE_W32_IME
   int IME_command_loop_flag = 0;
-  int old_rksl = read_key_sequence_level;
-  int new_rksl = read_key_sequence_level + 1;
+  int old_ime_stauts = -1;
 #endif
 
   raw_keybuf_count = 0;
@@ -9012,8 +9011,12 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
 	}
 
 #ifdef USE_W32_IME
-      if (IME_command_loop_flag)
-	read_key_sequence_level = new_rksl;
+      if (IME_command_loop_flag) {
+	if (old_ime_stauts < 0)
+	  old_ime_stauts = NILP(Fime_get_open_status()) ? 0 : 1;
+	if (old_ime_stauts)
+	  Fime_set_open_status(1, &(Lisp_Object){Qt});
+      }
       IME_command_loop_flag = 1;
 #endif
       if (t >= bufsize)
@@ -9123,7 +9126,9 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
 	    {
 	      unbind_to (count, Qnil);
 #ifdef USE_W32_IME
-	      read_key_sequence_level = old_rksl;
+	      if (old_ime_stauts >= 0)
+		Fime_set_open_status
+		  (1, &(Lisp_Object){old_ime_stauts ? Qt : Qnil});
 #endif
 	      return -1;
 	    }
@@ -9687,7 +9692,9 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
     : Qnil;
 
 #ifdef USE_W32_IME
-  read_key_sequence_level = old_rksl;
+  if (old_ime_stauts >= 0)
+    Fime_set_open_status
+      (1, &(Lisp_Object){old_ime_stauts ? Qt : Qnil});
 #endif
   unread_switch_frame = delayed_switch_frame;
   unbind_to (count, Qnil);

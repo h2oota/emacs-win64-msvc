@@ -3285,47 +3285,6 @@ deliver_wm_chars (int do_translate, HWND hwnd, UINT msg, UINT wParam,
 /***********************************************************************
 			  Input Method Editor
 ***********************************************************************/
-/* unicode kana => roman reverse conversion */
-/* half width kana FF61-FF9F */
-static const char kana_roman_101[0xffa0 - 0xff61] = {
-  [0xFF61 - 0xFF61] = '.', // IDEOGRAPHIC FULL STOP
-  [0xFF62 - 0xFF61] = '[', // LEFT CORNER BRACKET
-  [0xFF63 - 0xFF61] = ']', // RIGHT CORNER BRACKET
-  [0xFF64 - 0xFF61] = ',', // IDEOGRAPHIC COMMA
-  [0xFF65 - 0xFF61] = '/', // KATAKANA MIDDLE DOT
-  [0xFF70 - 0xFF61] = '-', // KATAKANA-HIRAGANA PROLONGED SOUND MARK
-  [0xFF71 - 0xFF61] = 'a', // KATAKANA LETTER A
-  [0xFF72 - 0xFF61] = 'i', // KATAKANA LETTER I
-  [0xFF73 - 0xFF61] = 'u', // KATAKANA LETTER U
-  [0xFF74 - 0xFF61] = 'e', // KATAKANA LETTER E
-  [0xFF75 - 0xFF61] = 'o', // KATAKANA LETTER O
-};
-
-static const char kana_roman_106[0xffa0 - 0xff61] = {
-  [0xFF71 - 0xFF61] = 'a', // KATAKANA LETTER A
-  [0xFF72 - 0xFF61] = 'i', // KATAKANA LETTER I
-  [0xFF73 - 0xFF61] = 'u', // KATAKANA LETTER U
-  [0xFF74 - 0xFF61] = 'e', // KATAKANA LETTER E
-  [0xFF75 - 0xFF61] = 'o', // KATAKANA LETTER O
-
-  [0xFF8E - 0xFF61] = '-', // KATAKANA LETTER HO
-  [0xFF8D - 0xFF61] = '^', // KATAKANA LETTER HE
-
-  [0xFF9E - 0xFF61] = '@', // KATAKANA VOICED SOUND MARK
-  [0xFF9F - 0xFF61] = '[', // KATAKANA SEMI-VOICED SOUND MARK
-
-  [0xFF9A - 0xFF61] = ';', // KATAKANA LETTER ER
-  [0xFF79 - 0xFF61] = ':', // KATAKANA LETTER KE
-  [0xFF91 - 0xFF61] = ']', // KATAKANA LETTER MU
-
-  [0xFF88 - 0xFF61] = ',', // KATAKANA LETTER NE
-  [0xFF99 - 0xFF61] = '.', // KATAKANA LETTER RU
-  [0xFF92 - 0xFF61] = '/', // KATAKANA LETTER ME
-  [0xFF9B - 0xFF61] = '\\',// KATAKANA LETTER RO
-};
-static char kana_roman_generic[0xffa0 - 0xff61];
-static const char *kana_roman_translation_table = kana_roman_101;
-
 static int
 w32_get_ime_open_status (HWND hwnd)
 {
@@ -3739,43 +3698,6 @@ DEFUN ("ime-get-open-status", Fime_get_open_status,
     SendMessage (hwnd, WM_MULE_IMM_GET_OPEN_STATUS, 0, 0)
     ? Qt : Qnil;
 }
-DEFUN ("ime-set-kana-roman-translation-table",
-       Fime_set_kana_roman_translation_table,
-       Sime_set_kana_roman_translation_table, 1, 1, 0,
-       doc: /* set Ime kana roman translation TABLE.
-TABLE should be 101, 106 or vector.
-This TABLE will be used at temporary no-conversion mode*/)
-  (Lisp_Object table)
-{
-  if (INTEGERP (table))
-    switch(XINT(table)) {
-    case 101:
-      kana_roman_translation_table = kana_roman_101;
-      break;
-    case 104:
-      kana_roman_translation_table = kana_roman_106;
-      break;
-    default:
-      error ("Unknown keyboard: %d", XINT(table));
-      break;
-    }
-  else {
-    CHECK_VECTOR (table);
-
-    for (int i = 0; i < countof(kana_roman_generic); i++)
-      kana_roman_generic[i] = 0;
-    for (int i = 0, len = ASIZE (table);
-	 i < countof(kana_roman_generic) && i < len; i++) {
-      Lisp_Object v = AREF (table, i);
-      CHECK_NUMBER (v);
-      kana_roman_generic[i] = XFASTINT(v);
-    }
-    kana_roman_translation_table = kana_roman_generic;
-  }
-  return Qnil;
-}
-
-extern int read_key_sequence_level;
 #endif /* USE_W32_IME */
 
 /* Main window procedure */
@@ -4251,35 +4173,6 @@ w32_wnd_proc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       }
       goto dflt;
       break;
-    case WM_IME_COMPOSITION:
-      HIMC context;
-      if (!(lParam & (GCS_RESULTREADSTR | GCS_RESULTREADCLAUSE |
-		      GCS_RESULTSTR | GCS_RESULTCLAUSE)) &&
-	  (read_key_sequence_level > 0 || minibuf_level > 0) &&
-	  (context = (*get_ime_context_fn) (hwnd))) {
-
-	int size = (*get_composition_string_fn)
-	  (context, GCS_COMPREADSTR, NULL, 0);
-	wchar_t *buf = alloca(size);
-
-	(*get_composition_string_fn) (context, GCS_COMPREADSTR, buf, size);
-
-	(*notify_ime_fn) (context, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
-	(*release_ime_context_fn) (hwnd, context);
-
-	DWORD imode, smode;
-	(*get_ime_conversion_status_fn) (context, &imode, &smode);
-
-	for (int i = 0; i < size / sizeof(wchar_t) ; i++) {
-	  wchar_t c = buf[i];
-	  if ((imode & IME_CMODE_ROMAN) && // romaji
-	      buf[i] >= 0xff61 && buf[i] <= 0xff9f)
-	    c = kana_roman_translation_table[buf[i] - 0xff61];
-	  post_character_message (hwnd, WM_CHAR, c, 0,
-				  w32_get_key_modifiers (c, 0));
-	}
-      }
-      goto dflt;
 #if defined(USE_IME_RECONVERTSTRING) || defined(USE_IME_DOCUMENTFEED)
     case WM_IME_REQUEST:
       switch (wParam) {
