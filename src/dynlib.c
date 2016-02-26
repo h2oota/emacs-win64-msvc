@@ -214,7 +214,7 @@ dynlib_addr (void *addr, const char **fname, const char **symname)
 	     be stripped anyway).  So we just show the address and the
 	     file name; they can use that with addr2line or GDB to
 	     recover the symbolic name.  */
-	  sprintf (addr_str, "at 0x%x", (DWORD_PTR)addr);
+	  sprintf (addr_str, "at 0x%" PRIxPTR, (DWORD_PTR)addr);
 	  *symname = addr_str;
 	  result = true;
 	}
