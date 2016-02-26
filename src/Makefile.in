@@ -406,7 +406,6 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o \
 	$(SHEAP_OBJ) \
 	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(CYGWIN_OBJ) $(FONT_OBJ) \
 	$(W32_OBJ) $(WINDOW_SYSTEM_OBJ) $(XGSELOBJ)
-base_obj ::= $(base_obj:.o=.$(OBJEXT))
 obj = $(base_obj) $(NS_OBJC_OBJ)
 
 ## Object files used on some machine or other.
@@ -424,12 +423,14 @@ SOME_MACHINE_OBJECTS = dosfns.o msdos.o \
 SOME_MACHINE_OBJECTS ::= $(SOME_MACHINE_OBJECTS:.o=.$(OBJEXT))
 ## gmalloc.o if !SYSTEM_MALLOC && !DOUG_LEA_MALLOC, else empty.
 GMALLOC_OBJ=@GMALLOC_OBJ@
-
+GMALLOC_OBJ::=$(GMALLOC_OBJ:.o=.$(OBJEXT))
 ## vm-limit.o if !SYSTEM_MALLOC, else empty.
 VMLIMIT_OBJ=@VMLIMIT_OBJ@
+VMLIMIT_OBJ::=$(VMLIMIT_OBJ:.o=.$(OBJEXT))
 
 ## ralloc.o if !SYSTEM_MALLOC && REL_ALLOC, else empty.
 RALLOC_OBJ=@RALLOC_OBJ@
+RALLOC_OBJ::=$(RALLOC_OBJ:.o=.$(OBJEXT))
 
 ## Empty on Cygwin and MinGW, lastfile.o elsewhere.
 PRE_ALLOC_OBJ=@PRE_ALLOC_OBJ@
@@ -444,6 +445,7 @@ otherobj= $(TERMCAP_OBJ) $(PRE_ALLOC_OBJ) $(GMALLOC_OBJ) $(RALLOC_OBJ) \
 ## (On MinGW, firstfile.o should be before vm-limit.o.)
 FIRSTFILE_OBJ=@FIRSTFILE_OBJ@
 ALLOBJS = $(FIRSTFILE_OBJ) $(VMLIMIT_OBJ) $(obj) $(otherobj)
+ALLOBJS::=$(ALLOBJS:.o=.$(OBJEXT))
 
 all: emacs$(EXEEXT) $(OTHER_FILES)
 .PHONY: all
@@ -555,7 +557,7 @@ endif
 ## for the first time, this prevents any variation between configurations
 ## in the contents of the DOC file.
 ##
-$(etc)/DOC: lisp.mk $(libsrc)/make-docfile$(EXEEXT) $(obj) $(lisp)
+$(etc)/DOC: lisp.mk $(libsrc)/make-docfile$(EXEEXT) $(obj:.o=.$(OBJEXT)) $(lisp)
 	$(AM_V_GEN)$(MKDIR_P) $(etc)
 	-$(AM_V_at)rm -f $(etc)/DOC
 	$(AM_V_at)$(libsrc)/make-docfile -d $(srcdir) \
@@ -573,7 +575,7 @@ buildobj.h: Makefile
 	done >$@.tmp
 	$(AM_V_at)mv $@.tmp $@
 
-GLOBAL_SOURCES = $(base_obj:.$(OBJEXT)=.c) $(NS_OBJC_OBJ:.$(OBJEXT)=.m)
+GLOBAL_SOURCES = $(base_obj:.o=.c) $(NS_OBJC_OBJ:.o=.m)
 
 AM_V_GLOBALS = $(am__v_GLOBALS_@AM_V@)
 am__v_GLOBALS_ = $(am__v_GLOBALS_@AM_DEFAULT_V@)

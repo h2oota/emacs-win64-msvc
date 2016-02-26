@@ -1305,7 +1305,7 @@ case "$opsys" in
    UNEXEC_OBJ=unexhp9k800.o
    ;;
   mingw32)
-   UNEXEC_OBJ="unexw32.\$(OBJEXT)"
+   UNEXEC_OBJ=unexw32.o
    ;;
   sol2-10)
    # Use the Solaris dldump() function, called from unexsol.c, to dump
@@ -1968,8 +1968,8 @@ if test "${HAVE_W32}" = "yes"; then
   fi
   AC_CHECK_TOOL(WINDRES, [windres],
                 [AC_MSG_ERROR([No resource compiler found.])])
-  W32_OBJ="w32fns.\$(OBJEXT) w32menu.\$(OBJEXT) w32reg.\$(OBJEXT) w32font.\$(OBJEXT) w32term.\$(OBJEXT)"
-  W32_OBJ="$W32_OBJ w32xfns.\$(OBJEXT) w32select.\$(OBJEXT) w32uniscribe.\$(OBJEXT)"
+  W32_OBJ="w32fns.o w32menu.o w32reg.o w32font.o w32term.o"
+  W32_OBJ="$W32_OBJ w32xfns.o w32select.o w32uniscribe.o"
   EMACSRES="emacs.res"
   case "$canonical" in
     x86_64-*-*) EMACS_MANIFEST="emacs-x64.manifest" ;;
@@ -1990,13 +1990,13 @@ if test "${HAVE_W32}" = "yes"; then
     W32_RES_LINK="-Wl,emacs.res"
   else
     UPDATE_MANIFEST=update-game-score.exe.manifest
-    W32_OBJ="$W32_OBJ w32.\$(OBJEXT) w32console.\$(OBJEXT) w32heap.\$(OBJEXT) w32inevt.\$(OBJEXT) w32proc.\$(OBJEXT)"
+    W32_OBJ="$W32_OBJ w32.o w32console.o w32heap.o w32inevt.o w32proc.o"
     W32_LIBS="$W32_LIBS -lwinmm -lgdi32 -lcomdlg32"
     W32_LIBS="$W32_LIBS -lmpr -lwinspool -lole32 -lcomctl32 -lusp10"
     W32_RES_LINK="\$(EMACSRES)"
     CLIENTRES="emacsclient.res"
     CLIENTW="emacsclientw\$(EXEEXT)"
-    FIRSTFILE_OBJ="firstfile.\$(OBJEXT)"
+    FIRSTFILE_OBJ="firstfile.o"
     NTDIR=nt
     CM_OBJ=
     LIBS_ECLIENT="-lcomctl32"
@@ -2153,7 +2153,7 @@ elif test "$hybrid_malloc" = yes; then
   GMALLOC_OBJ=gmalloc.o
   VMLIMIT_OBJ=
 else
-  test "$doug_lea_malloc" != "yes" && GMALLOC_OBJ="gmalloc.\$(OBJEXT)"
+  test "$doug_lea_malloc" != "yes" && GMALLOC_OBJ="gmalloc.o"
   VMLIMIT_OBJ=vm-limit.o
 
   AC_CHECK_HEADERS([sys/vlimit.h])
@@ -2748,7 +2748,7 @@ case $with_file_notification,$opsys in
     AC_CHECK_HEADER(windows.h)
     if test "$ac_cv_header_windows_h" = yes ; then
        AC_DEFINE(HAVE_W32NOTIFY, 1, [Define to 1 to use w32notify.])
-       NOTIFY_OBJ="w32notify.\$(OBJEXT)"
+       NOTIFY_OBJ="w32notify.o"
        NOTIFY_SUMMARY="yes (w32)"
     fi ;;
 esac
@@ -3969,7 +3969,7 @@ fail;
 
 esac
 
-TERMCAP_OBJ="tparam.\$(OBJEXT)"
+TERMCAP_OBJ="tparam.o"
 if test $TERMINFO = yes; then
   AC_DEFINE(TERMINFO, 1, [Define to 1 if you use terminfo instead of termcap.])
   TERMCAP_OBJ=terminfo.o
@@ -5051,7 +5051,7 @@ if test "${REL_ALLOC}" = "yes" ; then
 	    [Define REL_ALLOC if you want to use the relocating allocator for
 	     buffer space.])
 
-  test "$system_malloc" != "yes" && RALLOC_OBJ="ralloc.\$(OBJEXT)"
+  test "$system_malloc" != "yes" && RALLOC_OBJ="ralloc.o"
 fi
 AC_SUBST(RALLOC_OBJ)
 
@@ -5063,7 +5063,7 @@ if test "$opsys" = "cygwin"; then
 elif test "$opsys" = "mingw32"; then
   CYGWIN_OBJ=
   PRE_ALLOC_OBJ=
-  POST_ALLOC_OBJ="lastfile.\$(OBJEXT)"
+  POST_ALLOC_OBJ="lastfile.o"
 else
   CYGWIN_OBJ=
   PRE_ALLOC_OBJ=lastfile.o
@@ -5211,7 +5211,7 @@ AC_SUBST(LD_SWITCH_SYSTEM_TEMACS)
 if test "$window_system" != "none"; then
   AC_DEFINE(HAVE_WINDOW_SYSTEM, 1, [Define if you have a window system.])
   AC_DEFINE(POLL_FOR_INPUT, 1, [Define if you poll periodically to detect C-g.])
-  WINDOW_SYSTEM_OBJ="fontset.\$(OBJEXT) fringe.\$(OBJEXT) image.\$(OBJEXT)"
+  WINDOW_SYSTEM_OBJ="fontset.o fringe.o image.o"
 fi
 
 AC_SUBST(WINDOW_SYSTEM_OBJ)
