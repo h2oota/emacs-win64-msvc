@@ -1,6 +1,6 @@
 diff --git a/build-aux/compile.orig b/build-aux/compile
 index fadacbc..70b1eed 100644
---- a/build-aux/compile.orig
+--- a/build-aux/compile
 +++ b/build-aux/compile
 @@ -132,6 +132,7 @@ func_cl_wrapper ()
    # Assume a capable shell
@@ -66,7 +66,7 @@ index fadacbc..70b1eed 100644
    exec "$@" $linker_opts
    exit 1
  }
- 
+
 +# func_rc_wrapper rc arg...
 +# Adjust compile command to suit rc
 +func_rc_wrapper ()
@@ -135,7 +135,7 @@ index fadacbc..70b1eed 100644
 +}
 +
  eat=
- 
+
  case $1 in
 @@ -258,6 +347,12 @@ EOF
    cl | *[/\\]cl | cl.exe | *[/\\]cl.exe )
@@ -148,5 +148,5 @@ index fadacbc..70b1eed 100644
 +    func_ar_wrapper "$@"      # Doesn't return...
 +    ;;
  esac
- 
+
  ofile=
