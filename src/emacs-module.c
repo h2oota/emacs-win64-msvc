@@ -113,7 +113,7 @@ static void module_handle_throw (emacs_env *, Lisp_Object);
 static void module_non_local_exit_signal_1 (emacs_env *, Lisp_Object, Lisp_Object);
 static void module_non_local_exit_throw_1 (emacs_env *, Lisp_Object, Lisp_Object);
 static void module_out_of_memory (emacs_env *);
-static void module_reset_handlerlist (const int *);
+static void module_reset_handlerlist (struct handler **);
 static void module_wrong_type (emacs_env *, Lisp_Object, Lisp_Object);
 
 /* We used to return NULL when emacs_value was a different type from
@@ -176,7 +176,7 @@ static emacs_value const module_nil = 0;
       module_out_of_memory (env);					\
       return __VA_ARGS__;						\
     }									\
-  int dummy;								\
+  struct handler *dummy = c;						\
   __try {								\
   if (sys_setjmp (c->jmp))						\
     {									\
@@ -189,9 +189,10 @@ static emacs_value const module_nil = 0;
   MODULE_FUNCTION_END_1 (CONDITION_CASE);				\
   return __VA_ARGS__
 #define MODULE_FUNCTION_END_1(handlertype)				\
-  }  __finally {							\
+  }									\
+  __finally {								\
     module_reset_handlerlist(&internal_cleanup_##handlertype);		\
-     }									\
+  }									\
   do { } while(false)
 #else
 #define MODULE_SETJMP_1(handlertype, handlerfunc, c, dummy, ...)	\
@@ -204,9 +205,10 @@ static emacs_value const module_nil = 0;
       return __VA_ARGS__;						\
     }									\
   verify (module_has_cleanup);						\
-  int dummy __attribute__ ((cleanup (module_reset_handlerlist)));	\
+  struct handler * dummy __attribute__ ((cleanup (module_reset_handlerlist))) = c;	\
   if (sys_setjmp (c->jmp))						\
     {									\
+      dummy = NULL;							\
       (handlerfunc) (env, c->val);					\
       return __VA_ARGS__;						\
     }									\
@@ -1067,9 +1069,10 @@ finalize_environment (struct emacs_env_private *env)
    code in eval.c for details.  The macros below arrange for this
    function to be called automatically.  DUMMY is ignored.  */
 static void
-module_reset_handlerlist (const int *dummy)
+module_reset_handlerlist (struct handler **c)
 {
-  handlerlist = handlerlist->next;
+  if (handlerlist == *c)
+    handlerlist = handlerlist->next;
 }
 
 /* Called on `signal'.  ERR is a pair (SYMBOL . DATA), which gets

@@ -195,6 +195,9 @@ struct emacs_env_25
 };
 
 /* Every module should define a function as follows.  */
+#ifdef _MSC_VER
+__declspec(dllexport)
+#endif
 extern int emacs_module_init (struct emacs_runtime *ert);
 
 #ifdef __cplusplus
