@@ -22,6 +22,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <stdlib.h>
 #include <emacs-module.h>
 
+#ifdef _MSC_VER
+__declspec(dllexport)
+#endif
 int plugin_is_GPL_compatible;
 
 /* Always return symbol 't'.  */
