@@ -62,10 +62,7 @@
 
 (defcustom migemo-directory
   (expand-file-name
-   "euc-jp.d" (concat
-	       (or (getenv "emacs_dir")
-		   (concat invocation-directory ".."))
-	       "/etc/dict"))
+   "utf8.d" data-directory)
   "*Directory where migemo files are placed"
   :group 'migemo
   :type 'directory)
