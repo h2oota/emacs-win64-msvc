@@ -42,6 +42,7 @@ InfoPlist.strings
 Makefile
 makefile
 !etc/refcards/Makefile
+!modules/mod-cmigemo/Makefile
 !modules/mod-test/Makefile
 !test/lisp/progmodes/flymake-resources/Makefile
 !test/manual/indent/Makefile
