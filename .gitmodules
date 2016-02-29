@@ -1,0 +1,3 @@
+[submodule "modules/mod-cmigemo/cmigemo"]
+	path = modules/mod-cmigemo/cmigemo
+	url = https://github.com/koron/cmigemo.git
