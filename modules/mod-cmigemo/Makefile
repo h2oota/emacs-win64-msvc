@@ -29,10 +29,12 @@ cmigemo.lib: $(OBJ)
 
 $(MIGEMO_DICT)/migemo-dict:
 	make -C $(MIGEMO_DICT)  base-dict
-	mv $(MIGEMO_DICT)/base-dict $(MIGEMO_DICT)/migemo-dict
+	mv $(MIGEMO_DICT)/base-dict $@
+	rm $(MIGEMO_DICT)/SKK-JISYO.L
 
 utf8.d/dict-stamp: $(DICT_SRC)
 	@$(EMACS) -batch -l to-utf8.el $(DICT_SRC)
+	@rm -f $(MIGEMO_DICT)/migemo-dict
 	@touch $@
 
 cmigemo.el.gz: cmigemo.el
@@ -50,5 +52,5 @@ check: mod-cmigemo.dll dict-stamp
 	$(CC) $(CFLAGS) -Fe:$@ $< -link -dll -manifest $(LIBS) && \
 	mt -nologo -manifest $@.manifest "-outputresource:$@;#2"
 clean:
-	rm cmigemo.lib $(OBJ) cmigemo.elc cmigemo.el.gz mod-cmigemo.dll
+	rm -f cmigemo.lib $(OBJ) cmigemo.elc cmigemo.el.gz mod-cmigemo.dll
 	rm -rf utf8.d
