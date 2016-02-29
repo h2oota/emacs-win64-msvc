@@ -30,11 +30,9 @@ cmigemo.lib: $(OBJ)
 $(MIGEMO_DICT)/migemo-dict:
 	make -C $(MIGEMO_DICT)  base-dict
 	mv $(MIGEMO_DICT)/base-dict $@
-	rm $(MIGEMO_DICT)/SKK-JISYO.L
 
 utf8.d/dict-stamp: $(DICT_SRC)
 	@$(EMACS) -batch -l to-utf8.el $(DICT_SRC)
-	@rm -f $(MIGEMO_DICT)/migemo-dict
 	@touch $@
 
 cmigemo.el.gz: cmigemo.el
