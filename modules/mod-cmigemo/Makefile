@@ -38,10 +38,10 @@ utf8.d/dict-stamp: $(DICT_SRC)
 cmigemo.el.gz: cmigemo.el
 	gzip -fk $<
 cmigemo.elc: cmigemo.el
-	$(EMACS) -batch -f batch-byte-compile $<
+	$(EMACS) -batch  -l add-load-path.el -f batch-byte-compile $<
 
 check: mod-cmigemo.dll dict-stamp
-	$(EMACS) -batch -l ert -l test.el -f ert-run-tests-batch-and-exit
+	$(EMACS) -batch-l ert -l test.el -f ert-run-tests-batch-and-exit
 
 .SUFFIXES: .obj .dll
 .c.obj:
