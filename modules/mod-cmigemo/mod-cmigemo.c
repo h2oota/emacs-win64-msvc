@@ -100,7 +100,7 @@ static emacs_value Fcmigemo_open
 
   migemo_setproc_int2char(pmigemo, int2char);
   migemo_set_operator(pmigemo, MIGEMO_OPINDEX_OR, "\\|");
-  migemo_set_operator(pmigemo, MIGEMO_OPINDEX_NEST_IN, "\\(");
+  migemo_set_operator(pmigemo, MIGEMO_OPINDEX_NEST_IN, "\\(?:");
   migemo_set_operator(pmigemo, MIGEMO_OPINDEX_NEST_OUT, "\\)");
   migemo_set_operator(pmigemo, MIGEMO_OPINDEX_NEWLINE, "\\s-*");
 
