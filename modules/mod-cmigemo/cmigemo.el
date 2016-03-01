@@ -38,6 +38,11 @@ Turning on cmigemo search turns off regexp mode.")
   "cmigemo - Japanese incremental search trough dynamic pattern expansion."
   :group 'matching)
 
+(defcustom cmigemo-detect-default-mode t
+  "if t, detect buffer's coding system and choose migemo or search-default-mode, "
+  :group 'cmigemo
+  :type 'boolean)
+
 (defcustom cmigemo-white-space-regexp "[ 　\t\r\n]*"
   "*Regexp representing white spaces."
   :group 'cmigemo
@@ -322,8 +327,9 @@ into the cmigemo's regexp pattern."
 (advice-add 'isearch-mode :around
   (lambda (func &rest args)
     (let ((search-default-mode
-           (if (japanese-p (detect-coding-with-language-environment
-                            (point-min) (point-max) "japanese"))
+           (if (and cmigemo-detect-default-mode
+                    (japanese-p (detect-coding-with-language-environment
+                                 (point-min) (point-max) "japanese")))
                #'cmigemo-search-pattern-get
              search-default-mode )))
       (apply func args)))
