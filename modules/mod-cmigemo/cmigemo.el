@@ -27,7 +27,7 @@
 
 (require 'character-fold)
 (require 'mod-cmigemo)
-(isearch-define-mode-toggle cmigemo "m" cmigemo-get-pattern "\
+(isearch-define-mode-toggle C/Migemo "m" cmigemo-get-pattern "\
 Turning on cmigemo search turns off regexp mode.")
 
 ;;; Code:
@@ -283,8 +283,6 @@ Turning on cmigemo search turns off regexp mode.")
       (message (format "No dynamic expansion for `%s' found"
 		       cmigemo-dabbrev-pattern)))
     (add-hook 'pre-command-hook 'cmigemo-dabbrev-expand-done)))
-
-(add-hook 'kill-emacs-hook 'cmigemo-pattern-alist-save)
 
 (provide 'cmigemo)
 
