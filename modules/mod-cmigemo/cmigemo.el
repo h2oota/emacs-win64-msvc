@@ -349,7 +349,8 @@ into the cmigemo's regexp pattern."
           cmigemo-search-pattern-alist nil)))
 
 ;; experimental
-;; (define-key global-map "\M-;" 'cmigemo-dabbrev-expand)
+(define-key global-map (kbd "C-M-;") #'cmigemo-dabbrev-expand)
+
 (defcustom cmigemo-dabbrev-display-message nil
   "*Display dabbrev message to minibuffer."
   :group 'cmigemo
