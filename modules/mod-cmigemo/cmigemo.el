@@ -29,9 +29,6 @@
 (require 'mod-cmigemo)
 (isearch-define-mode-toggle cmigemo "m" cmigemo-search-pattern-get "\
 Turning on cmigemo search turns off regexp mode.")
-(define-key isearch-mode-map "\C-d" 'cmigemo-isearch-yank-char)
-(define-key isearch-mode-map "\C-w" 'cmigemo-isearch-yank-word)
-(define-key isearch-mode-map "\C-y" 'cmigemo-isearch-yank-line)
 
 ;;; Code:
 (defgroup cmigemo nil
@@ -338,8 +335,7 @@ into the cmigemo's regexp pattern."
 (defun japanese-p (coding-system-list)
   (cond ((atom coding-system-list) nil)
 	((member (car coding-system-list)
-		 coding-system-for-japanese)
-	 t)
+		 coding-system-for-japanese) t)
 	(t (japanese-p (cdr coding-system-list)))))
 
 (add-hook 'isearch-mode-hook
@@ -351,60 +347,6 @@ into the cmigemo's regexp pattern."
   (lambda ()
     (setq cmigemo-search-pattern nil
           cmigemo-search-pattern-alist nil)))
-
-(defun cmigemo-isearch-yank-char ()
-  "Pull next character from buffer into search string with cmigemo."
-  (interactive)
-  (when (eq isearch-regexp-function #'cmigemo-search-pattern-get)
-    (setq isearch-string (buffer-substring-no-properties
-                          isearch-other-end (point)))
-    (setq isearch-message isearch-string))
-  (let ((search-upper-case (unless (eq isearch-regexp-function
-                                       #'cmigemo-search-pattern-get)
-                             search-upper-case)))
-    (isearch-yank-string
-     (save-excursion
-       (and (not isearch-forward) isearch-other-end
-            (goto-char isearch-other-end))
-       (buffer-substring-no-properties (point)
-                                       (progn (forward-char 1) (point)))))))
-
-(defun cmigemo-isearch-yank-word ()
-  "Pull next character from buffer into search string with cmigemo."
-  (interactive)
-  (when (eq isearch-regexp-function
-            #'cmigemo-search-pattern-get)
-    (setq isearch-string (buffer-substring-no-properties
-                          isearch-other-end (point)))
-    (setq isearch-message isearch-string))
-  (let ((search-upper-case (unless (eq isearch-regexp-function
-                                       #'cmigemo-search-pattern-get)
-                             search-upper-case)))
-    (isearch-yank-string
-     (save-excursion
-       (and (not isearch-forward) isearch-other-end
-            (goto-char isearch-other-end))
-       (buffer-substring-no-properties (point)
-                                       (progn (forward-word 1) (point)))))))
-
-(defun cmigemo-isearch-yank-line ()
-  "Pull next character from buffer into search string with cmigemo."
-  (interactive)
-  (when (eq isearch-regexp-function
-            #'cmigemo-search-pattern-get)
-    (setq isearch-string (buffer-substring-no-properties
-                          isearch-other-end (point)))
-    (setq isearch-message isearch-string))
-  (let ((search-upper-case (unless (eq isearch-regexp-function
-                                       #'cmigemo-search-pattern-get)
-                             search-upper-case)))
-    (isearch-yank-string
-     (save-excursion
-       (and (not isearch-forward) isearch-other-end
-            (goto-char isearch-other-end))
-       (buffer-substring-no-properties (point)
-                                       (line-end-position))))))
-
 
 ;; experimental
 ;; (define-key global-map "\M-;" 'cmigemo-dabbrev-expand)
