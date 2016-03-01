@@ -41,7 +41,7 @@ cmigemo.elc: cmigemo.el
 	$(EMACS) -batch  -l add-load-path.el -f batch-byte-compile $<
 
 check: mod-cmigemo.dll dict-stamp
-	$(EMACS) -batch-l ert -l test.el -f ert-run-tests-batch-and-exit
+	$(EMACS) -batch -l ert -l test.el -f ert-run-tests-batch-and-exit
 
 .SUFFIXES: .obj .dll
 .c.obj:
